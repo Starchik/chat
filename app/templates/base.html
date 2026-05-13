@@ -41,6 +41,9 @@
     {% block content %}{% endblock %}
 
     <script src="{{ asset_url('js/socket.io.min.js') }}"></script>
+    <script>
+        window.APP_RUNTIME = {{ runtime_config | tojson }};
+    </script>
     <script src="{{ asset_url('js/config.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

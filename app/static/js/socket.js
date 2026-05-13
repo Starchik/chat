@@ -4,6 +4,7 @@
     const deps = {
         chats: null,
         messages: null,
+        calls: null,
     };
 
     let socket = null;
@@ -28,6 +29,10 @@
 
     function emitSafe(eventName, payload) {
         if (!socket || !socket.connected) {
+            return;
+        }
+        if (typeof payload === "undefined") {
+            socket.emit(eventName);
             return;
         }
         socket.emit(eventName, payload);
@@ -123,6 +128,30 @@
                 console.warn("socket event error", payload.error);
             }
         });
+
+        socket.on("call_invite", (payload) => {
+            deps.calls?.onSocketCallInvite(payload || {});
+        });
+
+        socket.on("call_accept", (payload) => {
+            deps.calls?.onSocketCallAccept(payload || {});
+        });
+
+        socket.on("call_reject", (payload) => {
+            deps.calls?.onSocketCallReject(payload || {});
+        });
+
+        socket.on("call_end", (payload) => {
+            deps.calls?.onSocketCallEnd(payload || {});
+        });
+
+        socket.on("call_signal", (payload) => {
+            deps.calls?.onSocketCallSignal(payload || {});
+        });
+
+        socket.on("call_error", (payload) => {
+            deps.calls?.onSocketCallError(payload || {});
+        });
     }
 
     function joinChat(chatId) {
@@ -151,9 +180,30 @@
         return Boolean(socket?.connected);
     }
 
+    function callInvite(payload) {
+        emitSafe("call_invite", payload);
+    }
+
+    function callAccept(payload) {
+        emitSafe("call_accept", payload);
+    }
+
+    function callReject(payload) {
+        emitSafe("call_reject", payload);
+    }
+
+    function callEnd(payload) {
+        emitSafe("call_end", payload);
+    }
+
+    function callSignal(payload) {
+        emitSafe("call_signal", payload);
+    }
+
     function attachDependencies(nextDeps) {
         deps.chats = nextDeps.chats;
         deps.messages = nextDeps.messages;
+        deps.calls = nextDeps.calls;
     }
 
     return {
@@ -164,5 +214,10 @@
         sendTyping,
         readMessages,
         isConnected,
+        callInvite,
+        callAccept,
+        callReject,
+        callEnd,
+        callSignal,
     };
 }

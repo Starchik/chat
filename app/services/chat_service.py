@@ -24,7 +24,9 @@ class ChatService:
             .join(ChatMembership, ChatMembership.chat_id == Chat.id)
             .filter(ChatMembership.user_id == user_id)
         )
-        if not include_archived:
+        if include_archived:
+            query = query.filter(ChatMembership.is_archived.is_(True))
+        else:
             query = query.filter(ChatMembership.is_archived.is_(False))
         return query.order_by(Chat.last_message_at.desc()).all()
 

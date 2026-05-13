@@ -1,6 +1,129 @@
-﻿import os
+﻿import json
+import os
 from datetime import timedelta
 from pathlib import Path
+
+
+PUBLIC_WEBRTC_STUN_FALLBACK = (
+    "stun:stun.l.google.com:19302",
+    "stun:stun1.l.google.com:19302",
+    "stun:stun2.l.google.com:19302",
+    "stun:stun3.l.google.com:19302",
+    "stun:stun4.l.google.com:19302",
+)
+
+
+def _env_bool(name: str, default: bool = False):
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    normalized = raw_value.strip().lower()
+    return normalized in {"1", "true", "yes", "y", "on"}
+
+
+def _split_csv_env(name: str):
+    raw_value = os.getenv(name, "")
+    if not raw_value:
+        return []
+
+    chunks = raw_value.replace(";", ",").split(",")
+    return [item.strip() for item in chunks if item and item.strip()]
+
+
+def _normalize_ice_servers(raw_servers):
+    normalized_servers = []
+
+    for item in raw_servers:
+        if not isinstance(item, dict):
+            continue
+
+        urls = item.get("urls")
+        if isinstance(urls, str):
+            clean_urls = urls.strip()
+            if not clean_urls:
+                continue
+        elif isinstance(urls, list):
+            clean_list = [url.strip() for url in urls if isinstance(url, str) and url.strip()]
+            if not clean_list:
+                continue
+            clean_urls = clean_list[0] if len(clean_list) == 1 else clean_list
+        else:
+            continue
+
+        server = {"urls": clean_urls}
+
+        username = item.get("username")
+        credential = item.get("credential")
+        if isinstance(username, str) and username.strip():
+            server["username"] = username.strip()
+        if isinstance(credential, str) and credential.strip():
+            server["credential"] = credential.strip()
+
+        normalized_servers.append(server)
+
+    return normalized_servers
+
+
+def _server_has_url(servers, target_url: str):
+    for server in servers:
+        urls = server.get("urls")
+        if isinstance(urls, str) and urls == target_url:
+            return True
+        if isinstance(urls, list) and target_url in urls:
+            return True
+    return False
+
+
+def _load_webrtc_ice_servers():
+    servers = []
+
+    raw_json = os.getenv("WEBRTC_ICE_SERVERS_JSON", "").strip()
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, list):
+                servers.extend(_normalize_ice_servers(parsed))
+        except Exception:
+            # Ignore malformed JSON and continue with plain env vars.
+            pass
+
+    for stun_url in _split_csv_env("WEBRTC_STUN_SERVERS"):
+        if not _server_has_url(servers, stun_url):
+            servers.append({"urls": stun_url})
+
+    turn_urls = _split_csv_env("WEBRTC_TURN_URLS")
+    if not turn_urls:
+        turn_single = (os.getenv("WEBRTC_TURN_URL") or "").strip()
+        if turn_single:
+            turn_urls = [turn_single]
+
+    unique_turn_urls = [url for url in turn_urls if not _server_has_url(servers, url)]
+    if unique_turn_urls:
+        turn_server = {
+            "urls": unique_turn_urls[0] if len(unique_turn_urls) == 1 else unique_turn_urls,
+        }
+
+        turn_username = (os.getenv("WEBRTC_TURN_USERNAME") or "").strip()
+        turn_credential = (os.getenv("WEBRTC_TURN_CREDENTIAL") or "").strip()
+
+        if turn_username:
+            turn_server["username"] = turn_username
+        if turn_credential:
+            turn_server["credential"] = turn_credential
+
+        servers.append(turn_server)
+
+    if _env_bool("WEBRTC_ENABLE_PUBLIC_STUN_FALLBACK", True):
+        for fallback_url in PUBLIC_WEBRTC_STUN_FALLBACK:
+            if not _server_has_url(servers, fallback_url):
+                servers.append({"urls": fallback_url})
+
+    normalized = _normalize_ice_servers(servers)
+    if normalized:
+        return normalized
+
+    return [{"urls": PUBLIC_WEBRTC_STUN_FALLBACK[0]}]
 
 
 class Config:
@@ -8,7 +131,7 @@ class Config:
     INSTANCE_DIR = BASE_DIR / "instance"
 
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-me")
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-key-change-me-min-32-bytes")
 
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
@@ -47,3 +170,6 @@ class Config:
 
     SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "eventlet")
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+
+    WEBRTC_ICE_SERVERS = _load_webrtc_ice_servers()
+    WEBRTC_RING_TIMEOUT_SEC = int(os.getenv("WEBRTC_RING_TIMEOUT_SEC", "45"))

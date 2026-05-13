@@ -198,12 +198,19 @@
         refs.toggleArchivedBtn.textContent = state.showArchived ? "Активные" : "Архив";
     }
 
+    function isChatVisibleInCurrentMode(chat) {
+        if (!chat) {
+            return false;
+        }
+        return state.showArchived ? Boolean(chat.is_archived) : !chat.is_archived;
+    }
+
     function upsertChat(chat) {
         if (!chat?.id) {
             return;
         }
 
-        if (!state.showArchived && chat.is_archived) {
+        if (!isChatVisibleInCurrentMode(chat)) {
             removeChat(chat.id);
             return;
         }
@@ -486,7 +493,12 @@
             await api.archiveChat(currentChat.id, nextArchiveState);
             currentChat.is_archived = nextArchiveState;
 
-            if (!state.showArchived && nextArchiveState) {
+            const movedOutOfCurrentList = (
+                (!state.showArchived && nextArchiveState)
+                || (state.showArchived && !nextArchiveState)
+            );
+
+            if (movedOutOfCurrentList) {
                 removeChat(currentChat.id);
                 state.currentChatId = null;
 
@@ -691,10 +703,6 @@
             }
         });
 
-        refs.archiveChatBtn.addEventListener("click", () => {
-            void toggleArchiveForCurrentChat();
-        });
-
         refs.avatarInput.addEventListener("change", async (event) => {
             const file = event.target.files?.[0];
             if (!file) {
@@ -730,5 +738,6 @@
         applyChatPayload,
         updateUserPresence,
         markCurrentChatRead,
+        toggleArchiveForCurrentChat,
     };
 }

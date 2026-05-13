@@ -73,6 +73,15 @@ def create_app():
 
     app.jinja_env.globals["asset_url"] = asset_url
 
+    @app.context_processor
+    def inject_runtime_config():
+        return {
+            "runtime_config": {
+                "webrtc_ice_servers": app.config.get("WEBRTC_ICE_SERVERS", []),
+                "webrtc_ring_timeout_sec": int(app.config.get("WEBRTC_RING_TIMEOUT_SEC", 45)),
+            }
+        }
+
     @app.get("/")
     def index():
         return render_template("chat.html")

@@ -1,4 +1,4 @@
-const CACHE_NAME = "messenger-static-v18";
+const CACHE_NAME = "messenger-static-v21";
 const OFFLINE_URLS = [
     "/",
     "/login",
@@ -18,6 +18,7 @@ const OFFLINE_URLS = [
     "/static/js/chats.js",
     "/static/js/messages.js",
     "/static/js/uploads.js",
+    "/static/js/calls.js",
     "/static/js/socket.js",
     "/static/js/sw-register.js",
     "/static/manifest.json",

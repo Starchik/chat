@@ -2,6 +2,40 @@
 {% block title %}Messenger{% endblock %}
 
 {% block content %}
+<style>
+    /* Hotfix: force compact icon-only profile actions even with stale static CSS */
+    #theme-toggle,
+    #logout-btn {
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        flex: 0 0 28px !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 8px !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        transform: none !important;
+    }
+
+    #theme-toggle i,
+    #logout-btn i {
+        font-size: 0.88rem !important;
+        line-height: 1 !important;
+    }
+
+    #theme-toggle:hover,
+    #logout-btn:hover {
+        background: rgba(100, 182, 255, 0.14) !important;
+    }
+
+    [data-theme="light"] #theme-toggle:hover,
+    [data-theme="light"] #logout-btn:hover {
+        background: rgba(90, 149, 218, 0.16) !important;
+    }
+</style>
 <div class="app-root" id="app-root">
     <div class="app-root__ambient" aria-hidden="true"></div>
 
@@ -82,9 +116,6 @@
                 <button id="menu-action-btn" class="icon-btn" type="button" aria-label="Меню чата">
                     <i class="fa-solid fa-ellipsis-vertical"></i>
                 </button>
-                <button id="archive-chat-btn" class="icon-btn" type="button" aria-label="Архив чата">
-                    <i class="fa-regular fa-folder-open"></i>
-                </button>
             </div>
         </header>
 
@@ -143,6 +174,70 @@
     <button data-action="pin" type="button"><i class="fa-solid fa-thumbtack"></i><span>Закрепить</span></button>
     <button data-action="delete" type="button" class="danger"><i class="fa-regular fa-trash-can"></i><span>Удалить</span></button>
 </div>
+
+<div id="chat-actions-menu" class="context-menu hidden">
+    <button id="chat-archive-action" type="button">
+        <i class="fa-solid fa-box-archive"></i>
+        <span>В архив</span>
+    </button>
+</div>
+
+<div id="call-overlay" class="call-overlay hidden" aria-live="polite">
+    <section id="call-panel" class="call-panel call-panel--audio">
+        <div class="call-panel__head">
+            <span id="call-mode-badge" class="call-mode-badge">Аудиозвонок</span>
+            <button id="call-minimize-btn" class="icon-btn" type="button" aria-label="Свернуть звонок">
+                <i class="fa-solid fa-window-minimize"></i>
+            </button>
+        </div>
+
+        <div class="call-panel__peer">
+            <img id="call-peer-avatar" class="avatar avatar-lg" src="{{ url_for('static', filename='icons/icon-192.svg') }}" alt="Собеседник" />
+            <div class="call-panel__peer-meta">
+                <div id="call-peer-name" class="call-panel__peer-name">Пользователь</div>
+                <div id="call-status-text" class="call-panel__status">Подключение...</div>
+            </div>
+        </div>
+
+        <div class="call-panel__media">
+            <video id="call-remote-video" class="call-video call-video--remote" autoplay playsinline></video>
+            <video id="call-local-video" class="call-video call-video--local" autoplay playsinline muted></video>
+
+            <div id="call-audio-visual" class="call-audio-visual hidden" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+
+        <div class="call-panel__actions">
+            <div id="call-incoming-actions" class="call-actions hidden">
+                <button id="call-reject-btn" class="call-action call-action--danger" type="button" aria-label="Отклонить">
+                    <i class="fa-solid fa-phone-slash"></i>
+                </button>
+                <button id="call-accept-btn" class="call-action call-action--success" type="button" aria-label="Принять">
+                    <i class="fa-solid fa-phone"></i>
+                </button>
+            </div>
+
+            <div id="call-ongoing-actions" class="call-actions hidden">
+                <button id="call-mute-btn" class="call-action" type="button" aria-label="Выключить микрофон">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
+                <button id="call-camera-btn" class="call-action" type="button" aria-label="Выключить камеру">
+                    <i class="fa-solid fa-video"></i>
+                </button>
+                <button id="call-end-btn" class="call-action call-action--danger" type="button" aria-label="Завершить">
+                    <i class="fa-solid fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+</div>
+
+<button id="call-expand-fab" class="call-expand-fab hidden" type="button" aria-label="Развернуть звонок">
+    <i class="fa-solid fa-phone"></i>
+</button>
 
 <div id="modal-overlay" class="modal-overlay hidden">
     <div id="modal" class="modal"></div>

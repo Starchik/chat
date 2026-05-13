@@ -2,6 +2,7 @@
 import { initMessagesModule } from "./messages.js";
 import { initUploadsModule } from "./uploads.js";
 import { initSocketModule } from "./socket.js";
+import { initCallsModule } from "./calls.js";
 
 const token = window.AppStorage.getToken();
 if (!token) {
@@ -34,7 +35,6 @@ const refs = {
     chatAvatar: document.getElementById("chat-avatar"),
     chatTitle: document.getElementById("chat-title"),
     chatSubtitle: document.getElementById("chat-subtitle"),
-    archiveChatBtn: document.getElementById("archive-chat-btn"),
     callActionBtn: document.getElementById("call-action-btn"),
     videoActionBtn: document.getElementById("video-action-btn"),
     menuActionBtn: document.getElementById("menu-action-btn"),
@@ -60,6 +60,8 @@ const refs = {
     emojiPanel: document.getElementById("emoji-panel"),
 
     contextMenu: document.getElementById("context-menu"),
+    chatActionsMenu: document.getElementById("chat-actions-menu"),
+    chatArchiveAction: document.getElementById("chat-archive-action"),
     modalOverlay: document.getElementById("modal-overlay"),
     modal: document.getElementById("modal"),
     toastStack: document.getElementById("toast-stack"),
@@ -147,19 +149,81 @@ function closeContextMenu() {
     refs.contextMenu.style.top = "0px";
 }
 
-function openContextMenu(x, y) {
-    refs.contextMenu.classList.remove("hidden");
+function closeChatActionsMenu() {
+    if (!refs.chatActionsMenu) {
+        return;
+    }
+    refs.chatActionsMenu.classList.add("hidden");
+    refs.chatActionsMenu.style.left = "0px";
+    refs.chatActionsMenu.style.top = "0px";
+}
+
+function openFloatingMenu(menuElement, x, y) {
+    if (!menuElement) {
+        return;
+    }
+
+    menuElement.classList.remove("hidden");
 
     const padding = 8;
-    const menuRect = refs.contextMenu.getBoundingClientRect();
+    const menuRect = menuElement.getBoundingClientRect();
     const maxLeft = window.innerWidth - menuRect.width - padding;
     const maxTop = window.innerHeight - menuRect.height - padding;
 
     const left = Math.min(Math.max(x, padding), Math.max(padding, maxLeft));
     const top = Math.min(Math.max(y, padding), Math.max(padding, maxTop));
 
-    refs.contextMenu.style.left = `${left}px`;
-    refs.contextMenu.style.top = `${top}px`;
+    menuElement.style.left = `${left}px`;
+    menuElement.style.top = `${top}px`;
+}
+
+function openContextMenu(x, y) {
+    closeChatActionsMenu();
+    openFloatingMenu(refs.contextMenu, x, y);
+}
+
+function updateChatArchiveAction(chat = null) {
+    if (!refs.chatArchiveAction) {
+        return;
+    }
+
+    const label = refs.chatArchiveAction.querySelector("span");
+    const icon = refs.chatArchiveAction.querySelector("i");
+    const currentChat = chat || state.chats.find((item) => item.id === state.currentChatId) || null;
+
+    if (!currentChat) {
+        refs.chatArchiveAction.disabled = true;
+        if (label) {
+            label.textContent = "В архив";
+        }
+        if (icon) {
+            icon.className = "fa-solid fa-box-archive";
+        }
+        return;
+    }
+
+    refs.chatArchiveAction.disabled = false;
+    const isArchived = Boolean(currentChat.is_archived);
+
+    if (label) {
+        label.textContent = isArchived ? "Вернуть из архива" : "В архив";
+    }
+
+    if (icon) {
+        icon.className = isArchived ? "fa-regular fa-folder-open" : "fa-solid fa-box-archive";
+    }
+}
+
+function openChatActionsMenu() {
+    if (!refs.menuActionBtn || refs.menuActionBtn.disabled || !refs.chatActionsMenu) {
+        return;
+    }
+
+    const currentChat = state.chats.find((item) => item.id === state.currentChatId) || null;
+    updateChatArchiveAction(currentChat);
+
+    const rect = refs.menuActionBtn.getBoundingClientRect();
+    openFloatingMenu(refs.chatActionsMenu, rect.right, rect.bottom + 6);
 }
 
 function setSidebarOpen(next) {
@@ -237,7 +301,6 @@ function setChatHeader(chat) {
         refs.chatAvatar.src = avatarFallback("Chat", true);
         refs.chatTitle.textContent = "Выберите чат";
         refs.chatSubtitle.textContent = "Найдите пользователя или создайте чат";
-        refs.archiveChatBtn.disabled = true;
         if (refs.callActionBtn) {
             refs.callActionBtn.disabled = true;
         }
@@ -247,6 +310,8 @@ function setChatHeader(chat) {
         if (refs.menuActionBtn) {
             refs.menuActionBtn.disabled = true;
         }
+        updateChatArchiveAction(null);
+        closeChatActionsMenu();
         refs.pinnedWrapper.classList.add("hidden");
         refs.pinnedWrapper.textContent = "";
         delete refs.pinnedWrapper.dataset.messageId;
@@ -254,16 +319,16 @@ function setChatHeader(chat) {
         return;
     }
 
-    refs.archiveChatBtn.disabled = false;
     if (refs.callActionBtn) {
-        refs.callActionBtn.disabled = false;
+        refs.callActionBtn.disabled = Boolean(chat.is_group);
     }
     if (refs.videoActionBtn) {
-        refs.videoActionBtn.disabled = false;
+        refs.videoActionBtn.disabled = Boolean(chat.is_group);
     }
     if (refs.menuActionBtn) {
         refs.menuActionBtn.disabled = false;
     }
+    updateChatArchiveAction(chat);
     refs.chatAvatar.src = chat.avatar_url || avatarFallback(chat.title, true);
     refs.chatTitle.textContent = chat.title || "Без названия";
 
@@ -333,14 +398,24 @@ function bindBaseEvents(app) {
     refs.voiceBtn?.addEventListener("click", () => {
         showToast("Запись голосовых скоро появится");
     });
-    refs.callActionBtn?.addEventListener("click", () => {
-        showToast("Аудиозвонки скоро появятся");
+
+    refs.menuActionBtn?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const isOpen = refs.chatActionsMenu && !refs.chatActionsMenu.classList.contains("hidden");
+        if (isOpen) {
+            closeChatActionsMenu();
+        } else {
+            openChatActionsMenu();
+        }
     });
-    refs.videoActionBtn?.addEventListener("click", () => {
-        showToast("Видеозвонки скоро появятся");
-    });
-    refs.menuActionBtn?.addEventListener("click", () => {
-        showToast("Меню чата в разработке");
+    refs.chatArchiveAction?.addEventListener("click", async () => {
+        closeChatActionsMenu();
+        if (!app.modules?.chats?.toggleArchiveForCurrentChat) {
+            return;
+        }
+        await app.modules.chats.toggleArchiveForCurrentChat();
+        const nextChat = app.modules.chats.getChatById(state.currentChatId);
+        updateChatArchiveAction(nextChat || null);
     });
 
     refs.modalOverlay.addEventListener("click", (event) => {
@@ -352,6 +427,14 @@ function bindBaseEvents(app) {
     document.addEventListener("click", (event) => {
         if (!refs.contextMenu.contains(event.target)) {
             closeContextMenu();
+        }
+        if (
+            refs.chatActionsMenu
+            && !refs.chatActionsMenu.contains(event.target)
+            && event.target !== refs.menuActionBtn
+            && !refs.menuActionBtn?.contains(event.target)
+        ) {
+            closeChatActionsMenu();
         }
 
         if (!refs.searchResults.contains(event.target) && event.target !== refs.userSearch) {
@@ -373,6 +456,7 @@ function bindBaseEvents(app) {
     });
 
     window.addEventListener("resize", () => {
+        closeChatActionsMenu();
         if (window.innerWidth > 900 && state.sidebarOpen) {
             setSidebarOpen(false);
         }
@@ -441,21 +525,25 @@ async function boot() {
     const messages = initMessagesModule(app);
     const uploads = initUploadsModule(app);
     const chats = initChatsModule(app);
+    const calls = initCallsModule(app);
     const socket = initSocketModule(app);
 
     app.modules.messages = messages;
     app.modules.uploads = uploads;
     app.modules.chats = chats;
+    app.modules.calls = calls;
     app.modules.socket = socket;
 
     messages.attachDependencies({ chats, uploads });
     chats.attachDependencies({ messages });
     uploads.attachDependencies({ messages });
-    socket.attachDependencies({ chats, messages });
+    calls.attachDependencies({ chats, socket });
+    socket.attachDependencies({ chats, messages, calls });
 
     uploads.bindEvents();
     messages.bindEvents();
     chats.bindEvents();
+    calls.bindEvents();
 
     app.helpers.setChatSkeleton(true);
     await chats.loadChats();

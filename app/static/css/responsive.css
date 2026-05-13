@@ -101,17 +101,20 @@
     .fab-new-chat.mobile-only {
         display: inline-flex;
     }
+
+    .call-overlay {
+        padding: 0.72rem;
+    }
+
+    .call-panel {
+        width: min(420px, calc(100vw - 1.44rem));
+    }
 }
 
 @media (max-width: 720px) {
     .app-root {
         padding: 0.38rem;
         gap: 0.45rem;
-    }
-
-    .chat-header__right #call-action-btn,
-    .chat-header__right #video-action-btn {
-        display: none;
     }
 
     .chat-header__right {
@@ -212,6 +215,30 @@
     .fab-new-chat {
         right: 0.72rem;
         bottom: 0.72rem;
+    }
+
+    .call-overlay {
+        padding: 0.56rem;
+    }
+
+    .call-panel {
+        width: calc(100vw - 1.12rem);
+        border-radius: 18px;
+        padding: 0.7rem;
+    }
+
+    .call-video--local {
+        width: 92px;
+        height: 64px;
+        right: 0.46rem;
+        bottom: 0.46rem;
+    }
+
+    .call-expand-fab {
+        right: 0.68rem;
+        bottom: 4.4rem;
+        width: 46px;
+        height: 46px;
     }
 }
 

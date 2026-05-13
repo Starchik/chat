@@ -16,6 +16,7 @@
 - Поиск пользователей
 - Аватары пользователей
 - Архивация чатов
+- Аудиозвонки и видеозвонки 1:1 (WebRTC)
 - REST API + WebSocket
 - Тёмная/светлая тема
 - Адаптивный интерфейс (desktop/mobile)
@@ -31,6 +32,7 @@
 - Flask-JWT-Extended
 - Flask-SocketIO
 - SQLite
+- WebRTC
 - HTML/CSS/JavaScript
 
 ## Структура проекта
@@ -64,21 +66,12 @@
 │   │   ├── __init__.py
 │   │   └── events.py
 │   ├── static
-│   │   ├── css/style.css
-│   │   ├── js/api.js
-│   │   ├── js/auth.js
-│   │   ├── js/chat.js
-│   │   ├── js/config.js
-│   │   ├── js/storage.js
-│   │   ├── js/sw-register.js
-│   │   ├── icons/icon-192.svg
-│   │   ├── icons/icon-512.svg
+│   │   ├── css/
+│   │   ├── js/
+│   │   ├── icons/
 │   │   ├── manifest.json
 │   │   ├── sw.js
-│   │   └── uploads
-│   │       ├── avatars/.gitkeep
-│   │       ├── files/.gitkeep
-│   │       └── .gitkeep
+│   │   └── uploads/
 │   └── templates
 │       ├── base.html
 │       ├── chat.html
@@ -119,13 +112,81 @@ python run.py
 
 Используется файл `.env`:
 
-- `SECRET_KEY`
-- `JWT_SECRET_KEY`
+- `SECRET_KEY` (рекомендуется минимум 32 символа)
+- `JWT_SECRET_KEY` (рекомендуется минимум 32 символа)
 - `DATABASE_URL` (по умолчанию SQLite)
 - `JWT_EXPIRES_DAYS`
+- `MAX_CONTENT_LENGTH`
 - `SOCKETIO_ASYNC_MODE`
+- `CORS_ORIGINS`
 - `VAPID_CLAIMS_SUB`
+- `WEBRTC_RING_TIMEOUT_SEC`
+- `WEBRTC_ENABLE_PUBLIC_STUN_FALLBACK`
+- `WEBRTC_STUN_SERVERS`
+- `WEBRTC_TURN_URLS` / `WEBRTC_TURN_URL`
+- `WEBRTC_TURN_USERNAME`
+- `WEBRTC_TURN_CREDENTIAL`
+- `WEBRTC_ICE_SERVERS_JSON`
 - `HOST`, `PORT`, `FLASK_DEBUG`
+
+### WebRTC admin config (без JSON)
+
+Базовый self-host конфиг можно сделать так:
+
+```env
+WEBRTC_ENABLE_PUBLIC_STUN_FALLBACK=1
+WEBRTC_STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+WEBRTC_TURN_URLS=turn:turn.example.com:3478,turns:turn.example.com:5349
+WEBRTC_TURN_USERNAME=webrtc
+WEBRTC_TURN_CREDENTIAL=strong-password
+```
+
+### WebRTC advanced JSON (опционально)
+
+Если нужен тонкий контроль, можно добавить `WEBRTC_ICE_SERVERS_JSON`:
+
+```json
+[
+  { "urls": "stun:stun.l.google.com:19302" },
+  {
+    "urls": "turn:turn.example.com:3478",
+    "username": "webrtc",
+    "credential": "strong-password"
+  }
+]
+```
+
+JSON и simple mode можно использовать вместе: сервер объединит их и уберет дубликаты.
+
+## Self-host WebRTC (TURN/STUN)
+
+Для звонков в локальных/корпоративных сетях одного STUN обычно недостаточно. Для production добавьте свой TURN-сервер (например, coturn) и укажите его через `WEBRTC_TURN_*` (или через JSON).
+
+Короткий пример docker запуска coturn:
+
+```bash
+docker run -d --name coturn \
+  -p 3478:3478 -p 3478:3478/udp \
+  -p 5349:5349 -p 5349:5349/udp \
+  coturn/coturn \
+  -n --log-file=stdout \
+  --lt-cred-mech --realm=example.com \
+  --user=webrtc:strong-password
+```
+
+После этого добавьте TURN endpoint в `WEBRTC_TURN_URLS` или `WEBRTC_ICE_SERVERS_JSON`.
+
+## Если IP динамический
+
+Для динамического IP у self-host сценария рабочая схема такая:
+
+1. Используйте домен + DDNS (Cloudflare API, DuckDNS, No-IP, Dynu), чтобы домен всегда указывал на актуальный IP.
+2. В `WEBRTC_TURN_URLS` указывайте домен (`turn:turn.example.com:3478`), а не голый IP.
+3. Для HTTPS/`turns:` используйте автоматические сертификаты (Caddy/Traefik/Nginx + Let's Encrypt).
+4. На роутере включите проброс портов TURN (`3478` UDP/TCP и при необходимости `5349` TLS).
+5. Если сервер за NAT, для coturn задайте `external-ip`; при динамическом IP обновляйте его скриптом при смене адреса и перезапускайте coturn.
+
+Практически: для стабильного продакшна самый простой путь — маленький VPS со статическим IP под TURN.
 
 ## API (кратко)
 
@@ -161,6 +222,11 @@ Authorization: Bearer <token>
 - `typing`
 - `read_messages`
 - `presence_ping`
+- `call_invite`
+- `call_accept`
+- `call_reject`
+- `call_end`
+- `call_signal`
 
 Сервер -> клиент:
 
@@ -174,9 +240,20 @@ Authorization: Bearer <token>
 - `typing`
 - `messages_read`
 - `user_status`
+- `call_invite`
+- `call_accept`
+- `call_reject`
+- `call_end`
+- `call_signal`
+- `call_error`
+
+## Ограничения звонков
+
+- Сейчас поддерживаются только личные (1:1) звонки.
+- Групповые звонки пока не реализованы.
 
 ## Примечания
 
 - База данных инициализируется автоматически при старте приложения.
 - VAPID-ключи для push генерируются автоматически в `instance/` при первом запуске.
-- Для production рекомендуется заменить секреты в `.env`.
+- Для production обязательно замените секреты в `.env`.
