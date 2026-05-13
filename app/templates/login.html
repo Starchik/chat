@@ -1,0 +1,43 @@
+﻿{% extends "base.html" %}
+{% block title %}Вход | Messenger{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+    <div class="auth-card glass-card">
+        <div class="auth-brand">
+            <div class="brand-mark">
+                <i class="fa-solid fa-paper-plane"></i>
+            </div>
+            <div>
+                <h1>Messenger</h1>
+                <p>Войдите, чтобы продолжить общение</p>
+            </div>
+        </div>
+
+        <form id="login-form" class="auth-form" novalidate>
+            <label class="input-label" for="login-input">Логин или Email</label>
+            <div class="input-wrap">
+                <i class="fa-regular fa-user"></i>
+                <input id="login-input" type="text" name="login" required minlength="3" autocomplete="username" placeholder="username или email" />
+            </div>
+
+            <label class="input-label" for="password-input">Пароль</label>
+            <div class="input-wrap">
+                <i class="fa-solid fa-lock"></i>
+                <input id="password-input" type="password" name="password" required minlength="6" autocomplete="current-password" placeholder="Введите пароль" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">Войти</button>
+        </form>
+
+        <p class="auth-alt">Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
+        <div id="auth-error" class="auth-error" role="alert" aria-live="polite"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ asset_url('js/api.js') }}"></script>
+<script src="{{ asset_url('js/storage.js') }}"></script>
+<script src="{{ asset_url('js/auth.js') }}"></script>
+{% endblock %}

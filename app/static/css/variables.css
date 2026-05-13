@@ -1,0 +1,119 @@
+:root {
+    color-scheme: dark;
+
+    --bg: #070b14;
+    --sidebar: rgba(9, 14, 26, 0.78);
+    --card: rgba(22, 30, 48, 0.7);
+    --card-soft: rgba(18, 26, 42, 0.82);
+
+    --accent: #46d4ff;
+    --accent-hover: #61deff;
+    --accent-secondary: #7d8bff;
+    --accent-tertiary: #52f2ca;
+    --accent-gradient: linear-gradient(135deg, #46d4ff 0%, #7d8bff 52%, #52f2ca 100%);
+    --accent-gradient-soft: linear-gradient(130deg, rgba(70, 212, 255, 0.24), rgba(125, 139, 255, 0.21) 56%, rgba(82, 242, 202, 0.2));
+
+    --text: #f3f7ff;
+    --text-secondary: #9aa9c4;
+    --text-tertiary: #7a88a2;
+    --success: #32d48c;
+    --warning: #f7bf5e;
+    --danger: #ff6d86;
+
+    --line: rgba(139, 168, 217, 0.2);
+    --line-strong: rgba(143, 179, 239, 0.34);
+    --overlay: rgba(2, 8, 20, 0.72);
+
+    --surface-header: rgba(10, 16, 30, 0.66);
+    --surface-subtle: rgba(17, 25, 43, 0.6);
+    --surface-subtle-strong: rgba(15, 22, 38, 0.8);
+    --surface-composer: rgba(10, 16, 31, 0.76);
+    --surface-elevated: rgba(17, 25, 43, 0.9);
+    --surface-elevated-strong: rgba(15, 22, 39, 0.94);
+    --surface-floating: rgba(13, 20, 36, 0.94);
+    --surface-toast: rgba(14, 21, 37, 0.9);
+    --surface-control-soft: rgba(20, 29, 49, 0.72);
+    --surface-control-icon: rgba(23, 34, 58, 0.72);
+    --surface-attachment: rgba(14, 22, 38, 0.72);
+    --surface-zoom-controls: rgba(25, 37, 62, 0.68);
+    --surface-auth-card: rgba(10, 16, 28, 0.72);
+
+    --toast-text: var(--text);
+    --group-badge-text: #d4f4ff;
+    --danger-soft-text: #ffc5cf;
+    --drop-zone-text: #daf4ff;
+
+    --radius-xs: 9px;
+    --radius-sm: 14px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
+    --radius-xl: 30px;
+    --radius-full: 999px;
+
+    --shadow-sm: 0 8px 24px rgba(2, 6, 16, 0.28);
+    --shadow-md: 0 18px 48px rgba(2, 6, 16, 0.36);
+    --shadow-lg: 0 35px 90px rgba(2, 6, 16, 0.5);
+    --shadow-glow: 0 0 0 1px rgba(143, 212, 255, 0.24), 0 18px 45px rgba(37, 156, 255, 0.22);
+
+    --blur-sm: 10px;
+    --blur-md: 16px;
+    --blur-lg: 24px;
+
+    --sidebar-width: 360px;
+    --header-height: 84px;
+    --composer-height: 96px;
+
+    --ease: 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-soft: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="light"] {
+    color-scheme: light;
+
+    --bg: #edf4ff;
+    --sidebar: rgba(255, 255, 255, 0.84);
+    --card: rgba(255, 255, 255, 0.92);
+    --card-soft: rgba(241, 247, 255, 0.96);
+
+    --accent: #0ea5e9;
+    --accent-hover: #0284c7;
+    --accent-secondary: #4f46e5;
+    --accent-tertiary: #10b981;
+    --accent-gradient: linear-gradient(130deg, #0ea5e9 0%, #4f46e5 58%, #10b981 100%);
+    --accent-gradient-soft: linear-gradient(130deg, rgba(14, 165, 233, 0.12), rgba(79, 70, 229, 0.12) 56%, rgba(16, 185, 129, 0.1));
+
+    --text: #0b1324;
+    --text-secondary: #4d607f;
+    --text-tertiary: #6f81a0;
+    --success: #09935f;
+    --warning: #b97403;
+    --danger: #d81b5b;
+
+    --line: rgba(35, 71, 122, 0.18);
+    --line-strong: rgba(35, 71, 122, 0.3);
+    --overlay: rgba(19, 27, 44, 0.34);
+
+    --surface-header: rgba(255, 255, 255, 0.72);
+    --surface-subtle: rgba(244, 248, 255, 0.8);
+    --surface-subtle-strong: rgba(241, 247, 255, 0.94);
+    --surface-composer: rgba(255, 255, 255, 0.8);
+    --surface-elevated: rgba(255, 255, 255, 0.94);
+    --surface-elevated-strong: rgba(255, 255, 255, 0.98);
+    --surface-floating: rgba(255, 255, 255, 0.96);
+    --surface-toast: rgba(255, 255, 255, 0.95);
+    --surface-control-soft: rgba(239, 246, 255, 0.9);
+    --surface-control-icon: rgba(237, 244, 255, 0.95);
+    --surface-attachment: rgba(232, 242, 255, 0.92);
+    --surface-zoom-controls: rgba(239, 246, 255, 0.96);
+    --surface-auth-card: rgba(255, 255, 255, 0.82);
+
+    --toast-text: var(--text);
+    --group-badge-text: #1f3070;
+    --danger-soft-text: #9f1239;
+    --drop-zone-text: #0f3f79;
+
+    --shadow-sm: 0 8px 22px rgba(16, 34, 64, 0.13);
+    --shadow-md: 0 20px 45px rgba(16, 34, 64, 0.16);
+    --shadow-lg: 0 36px 85px rgba(16, 34, 64, 0.22);
+    --shadow-glow: 0 0 0 1px rgba(74, 131, 215, 0.2), 0 14px 35px rgba(59, 130, 246, 0.18);
+}

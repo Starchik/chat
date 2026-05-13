@@ -1,0 +1,33 @@
+﻿{
+    "name": "Flask Messenger",
+    "short_name": "Messenger",
+    "description": "Современный веб-мессенджер на Flask + Socket.IO",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#101820",
+    "theme_color": "#182533",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/static/icons/icon-192.svg",
+            "sizes": "192x192",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/static/icons/icon-512.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Открыть чаты",
+            "short_name": "Чаты",
+            "description": "Быстрый доступ к списку чатов",
+            "url": "/"
+        }
+    ]
+}

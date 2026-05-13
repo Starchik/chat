@@ -1,0 +1,160 @@
+﻿{% extends "base.html" %}
+{% block title %}Messenger{% endblock %}
+
+{% block content %}
+<div class="app-root" id="app-root">
+    <div class="app-root__ambient" aria-hidden="true"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar__glow" aria-hidden="true"></div>
+
+        <div class="sidebar__top">
+            <button id="mobile-close-sidebar" class="icon-btn mobile-only" type="button" aria-label="Закрыть меню">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+
+            <div class="profile-card">
+                <label class="profile-avatar-wrap" title="Сменить аватар">
+                    <input id="avatar-input" type="file" accept="image/*" hidden />
+                    <img id="me-avatar" class="avatar avatar-xl" src="{{ url_for('static', filename='icons/icon-192.svg') }}" alt="Ваш аватар" />
+                    <span class="avatar-edit-badge"><i class="fa-solid fa-camera"></i></span>
+                </label>
+
+                <div class="profile-meta">
+                    <div id="me-name" class="profile-name">...</div>
+                    <div id="me-username" class="profile-username">@...</div>
+                </div>
+
+                <div class="sidebar-actions">
+                    <button id="theme-toggle" class="icon-btn" type="button" aria-label="Сменить тему">
+                        <i class="fa-regular fa-moon"></i>
+                    </button>
+                    <button id="logout-btn" class="icon-btn" type="button" aria-label="Выйти">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar__search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="user-search" type="search" placeholder="Поиск пользователей" autocomplete="off" />
+            <div id="search-results" class="search-results hidden"></div>
+        </div>
+
+        <div class="sidebar__quick-buttons">
+            <button id="new-group-chat-btn" class="btn btn-soft btn-block" type="button">
+                <i class="fa-solid fa-user-group"></i>
+                <span>Новая группа</span>
+            </button>
+        </div>
+
+        <div class="sidebar__section-head">
+            <span>Чаты</span>
+            <button id="toggle-archived-btn" class="text-btn" type="button">Архив</button>
+        </div>
+
+        <div id="chat-list-skeleton" class="chat-list-skeleton hidden"></div>
+        <div id="chat-list" class="chat-list custom-scroll"></div>
+    </aside>
+
+    <section class="chat-panel">
+        <header class="chat-header" id="chat-header">
+            <div class="chat-header__left">
+                <button id="mobile-open-sidebar" class="icon-btn mobile-only" type="button" aria-label="Открыть меню">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+
+                <img id="chat-avatar" class="avatar avatar-lg" src="{{ url_for('static', filename='icons/icon-192.svg') }}" alt="Аватар чата" />
+                <div class="chat-header__meta">
+                    <div id="chat-title" class="chat-title">Выберите чат</div>
+                    <div id="chat-subtitle" class="chat-subtitle">Найдите пользователя или создайте чат</div>
+                </div>
+            </div>
+
+            <div class="chat-header__right">
+                <button id="call-action-btn" class="icon-btn" type="button" aria-label="Позвонить">
+                    <i class="fa-solid fa-phone"></i>
+                </button>
+                <button id="video-action-btn" class="icon-btn" type="button" aria-label="Видеозвонок">
+                    <i class="fa-solid fa-video"></i>
+                </button>
+                <button id="menu-action-btn" class="icon-btn" type="button" aria-label="Меню чата">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
+                <button id="archive-chat-btn" class="icon-btn" type="button" aria-label="Архив чата">
+                    <i class="fa-regular fa-folder-open"></i>
+                </button>
+            </div>
+        </header>
+
+        <div id="pinned-wrapper" class="pinned-banner hidden"></div>
+
+        <main id="messages-scroll" class="messages-scroll custom-scroll">
+            <div class="messages-scroll__overlay" aria-hidden="true"></div>
+            <div id="messages-loader" class="messages-loader hidden"></div>
+            <div id="messages-list" class="messages-list"></div>
+
+            <div id="chat-empty" class="chat-empty-state">
+                <div class="chat-empty-icon"><i class="fa-regular fa-comments"></i></div>
+                <h3>Чат пока пуст</h3>
+                <p>Отправьте первое сообщение, чтобы начать диалог.</p>
+            </div>
+
+            <div id="typing-indicator" class="typing-indicator hidden"></div>
+        </main>
+
+        <div id="reply-preview" class="reply-preview hidden"></div>
+
+        <footer class="composer" id="composer">
+            <div id="drop-zone" class="drop-zone hidden">Отпустите файлы, чтобы загрузить</div>
+            <div id="upload-preview" class="upload-preview hidden"></div>
+
+            <div class="composer__row">
+                <button id="emoji-btn" class="icon-btn" type="button" aria-label="Эмодзи">
+                    <i class="fa-regular fa-face-smile"></i>
+                </button>
+
+                <button id="attach-btn" class="icon-btn" type="button" aria-label="Прикрепить файл">
+                    <i class="fa-solid fa-paperclip"></i>
+                </button>
+                <input id="file-input" type="file" multiple hidden />
+
+                <textarea id="message-input" rows="1" placeholder="Введите сообщение..."></textarea>
+
+                <button id="voice-btn" class="icon-btn" type="button" aria-label="Голосовое сообщение">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
+
+                <button id="send-btn" class="send-btn" type="button" aria-label="Отправить">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+
+            <div id="emoji-panel" class="emoji-panel hidden"></div>
+        </footer>
+    </section>
+</div>
+
+<div id="context-menu" class="context-menu hidden">
+    <button data-action="reply" type="button"><i class="fa-solid fa-reply"></i><span>Ответить</span></button>
+    <button data-action="edit" type="button"><i class="fa-regular fa-pen-to-square"></i><span>Редактировать</span></button>
+    <button data-action="forward" type="button"><i class="fa-solid fa-share"></i><span>Переслать</span></button>
+    <button data-action="pin" type="button"><i class="fa-solid fa-thumbtack"></i><span>Закрепить</span></button>
+    <button data-action="delete" type="button" class="danger"><i class="fa-regular fa-trash-can"></i><span>Удалить</span></button>
+</div>
+
+<div id="modal-overlay" class="modal-overlay hidden">
+    <div id="modal" class="modal"></div>
+</div>
+
+<div id="toast-stack" class="toast-stack"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ asset_url('js/api.js') }}"></script>
+<script src="{{ asset_url('js/storage.js') }}"></script>
+<script src="{{ asset_url('js/sw-register.js') }}"></script>
+<script type="module" src="{{ asset_url('js/ui.js') }}"></script>
+{% endblock %}
+

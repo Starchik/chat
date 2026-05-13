@@ -1,0 +1,15 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.env.local
+instance/*.db
+instance/*.pem
+instance/*.txt
+app/static/uploads/avatars/*
+app/static/uploads/files/*
+!app/static/uploads/.gitkeep
+!app/static/uploads/avatars/.gitkeep
+!app/static/uploads/files/.gitkeep

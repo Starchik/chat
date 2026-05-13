@@ -1,0 +1,55 @@
+﻿{% extends "base.html" %}
+{% block title %}Регистрация | Messenger{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+    <div class="auth-card glass-card">
+        <div class="auth-brand">
+            <div class="brand-mark">
+                <i class="fa-solid fa-user-plus"></i>
+            </div>
+            <div>
+                <h1>Создать аккаунт</h1>
+                <p>Быстрая регистрация в Messenger</p>
+            </div>
+        </div>
+
+        <form id="register-form" class="auth-form" novalidate>
+            <label class="input-label" for="reg-username">Username</label>
+            <div class="input-wrap">
+                <i class="fa-regular fa-at"></i>
+                <input id="reg-username" type="text" name="username" required minlength="3" maxlength="32" autocomplete="username" placeholder="например, ihor" />
+            </div>
+
+            <label class="input-label" for="reg-display-name">Display Name</label>
+            <div class="input-wrap">
+                <i class="fa-regular fa-id-card"></i>
+                <input id="reg-display-name" type="text" name="display_name" required minlength="2" maxlength="64" autocomplete="name" placeholder="Как вас отображать" />
+            </div>
+
+            <label class="input-label" for="reg-email">Email</label>
+            <div class="input-wrap">
+                <i class="fa-regular fa-envelope"></i>
+                <input id="reg-email" type="email" name="email" required autocomplete="email" placeholder="you@example.com" />
+            </div>
+
+            <label class="input-label" for="reg-password">Пароль</label>
+            <div class="input-wrap">
+                <i class="fa-solid fa-lock"></i>
+                <input id="reg-password" type="password" name="password" required minlength="6" autocomplete="new-password" placeholder="Минимум 6 символов" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">Зарегистрироваться</button>
+        </form>
+
+        <p class="auth-alt">Уже есть аккаунт? <a href="/login">Войти</a></p>
+        <div id="auth-error" class="auth-error" role="alert" aria-live="polite"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ asset_url('js/api.js') }}"></script>
+<script src="{{ asset_url('js/storage.js') }}"></script>
+<script src="{{ asset_url('js/auth.js') }}"></script>
+{% endblock %}
