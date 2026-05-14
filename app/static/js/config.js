@@ -1,7 +1,7 @@
 ﻿window.APP_CONFIG = {
     apiBase: "/api",
     socketPath: "/socket.io",
-    cacheVersion: "v38",
+    cacheVersion: "v39",
     messagePageSize: 30,
     maxCachedMessages: 500,
     maxUploadFiles: 100,
@@ -10,7 +10,7 @@
         ? window.APP_RUNTIME.webrtc_ice_servers
         : [{ urls: "stun:stun.l.google.com:19302" }],
     webrtcRingTimeoutSec: Number(window.APP_RUNTIME?.webrtc_ring_timeout_sec) || 45,
-    webrtcRingtoneIncomingUrl: String(window.APP_RUNTIME?.webrtc_ringtone_incoming_url || "/static/sounds/ring-incoming.wav"),
+    webrtcRingtoneIncomingUrl: String(window.APP_RUNTIME?.webrtc_ringtone_incoming_url || "/static/sounds/ring-incoming2.wav"),
     webrtcRingtoneOutgoingUrl: String(window.APP_RUNTIME?.webrtc_ringtone_outgoing_url || "/static/sounds/ring-outgoing.wav"),
     webrtcRingtoneIncomingVolume: Math.max(0, Math.min(1, Number(window.APP_RUNTIME?.webrtc_ringtone_incoming_volume ?? 0.76))),
     webrtcRingtoneOutgoingVolume: Math.max(0, Math.min(1, Number(window.APP_RUNTIME?.webrtc_ringtone_outgoing_volume ?? 0.72))),

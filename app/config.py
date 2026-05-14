@@ -192,7 +192,7 @@ class Config:
     WEBRTC_RING_TIMEOUT_SEC = int(os.getenv("WEBRTC_RING_TIMEOUT_SEC", "45"))
     WEBRTC_RINGTONE_INCOMING_URL = os.getenv(
         "WEBRTC_RINGTONE_INCOMING_URL",
-        "/static/sounds/ring-incoming.wav",
+        "/static/sounds/ring-incoming2.wav",
     )
     WEBRTC_RINGTONE_OUTGOING_URL = os.getenv(
         "WEBRTC_RINGTONE_OUTGOING_URL",

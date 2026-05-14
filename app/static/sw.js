@@ -22,7 +22,7 @@ const OFFLINE_URLS = [
     "/static/js/calls.js",
     "/static/js/socket.js",
     "/static/js/sw-register.js",
-    "/static/sounds/ring-incoming.wav",
+    "/static/sounds/ring-incoming2.wav",
     "/static/sounds/ring-outgoing.wav",
     "/static/manifest.json",
     "/static/icons/icon-192.svg",
