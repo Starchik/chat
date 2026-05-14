@@ -57,6 +57,30 @@
     background: rgba(255, 255, 255, 0.7);
 }
 
+.chat-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(540px 300px at 12% 8%, rgba(72, 173, 255, 0.1), transparent 74%),
+        radial-gradient(550px 320px at 88% 4%, rgba(118, 120, 255, 0.1), transparent 72%),
+        radial-gradient(650px 360px at 50% 100%, rgba(72, 255, 204, 0.06), transparent 74%);
+}
+
+[data-theme="light"] .chat-panel::before {
+    background:
+        radial-gradient(540px 300px at 12% 8%, rgba(104, 175, 243, 0.16), transparent 74%),
+        radial-gradient(550px 320px at 88% 4%, rgba(138, 147, 255, 0.14), transparent 72%),
+        radial-gradient(650px 360px at 50% 100%, rgba(112, 228, 194, 0.1), transparent 74%);
+}
+
+.chat-panel > * {
+    position: relative;
+    z-index: 1;
+}
+
 .chat-header {
     position: relative;
     z-index: 20;
@@ -153,27 +177,11 @@
     padding: 1rem;
     display: flex;
     flex-direction: column;
-    isolation: isolate;
+    background: transparent;
 }
 
 .messages-scroll__overlay {
-    position: sticky;
-    top: 0;
-    left: 0;
-    width: 100%;
-    min-height: 100%;
-    margin-bottom: -100%;
-    z-index: 0;
-    pointer-events: none;
-    background:
-        radial-gradient(540px 300px at 12% 8%, rgba(72, 173, 255, 0.1), transparent 74%),
-        radial-gradient(550px 320px at 88% 4%, rgba(118, 120, 255, 0.1), transparent 72%),
-        radial-gradient(650px 360px at 50% 100%, rgba(72, 255, 204, 0.06), transparent 74%);
-}
-
-.messages-scroll > *:not(.messages-scroll__overlay) {
-    position: relative;
-    z-index: 1;
+    display: none;
 }
 
 .messages-loader {
