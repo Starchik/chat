@@ -547,19 +547,13 @@
     background: linear-gradient(90deg, rgba(86, 167, 240, 0.7), rgba(82, 134, 231, 0.68));
 }
 
-.message__audio-download {
+.message__audio-caption {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
     font-size: 0.74rem;
     color: var(--text-secondary);
-    text-decoration: none;
     width: fit-content;
-}
-
-.message__audio-download:hover {
-    color: var(--text);
-    text-decoration: none;
 }
 
 .message__reactions {

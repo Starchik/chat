@@ -377,10 +377,10 @@
                             </div>
                         </div>
                     </div>
-                    <a class="message__audio-download" href="${fileUrl}" target="_blank" rel="noopener noreferrer">
+                    <div class="message__audio-caption">
                         <i class="fa-solid fa-music"></i>
                         <span>${audioCaption}</span>
-                    </a>
+                    </div>
                 </div>
             `;
         }

@@ -1,7 +1,7 @@
 ﻿window.APP_CONFIG = {
     apiBase: "/api",
     socketPath: "/socket.io",
-    cacheVersion: "v48",
+    cacheVersion: "v49",
     messagePageSize: 30,
     maxCachedMessages: 500,
     maxUploadFiles: 100,
