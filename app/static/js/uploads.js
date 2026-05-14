@@ -7,7 +7,13 @@
 
     let dragCounter = 0;
     let uploadLocked = false;
+    let previewExpanded = false;
     const uploadProgressByKey = new Map();
+    const MOBILE_COLLAPSE_LIMIT = 3;
+
+    function isCompactViewport() {
+        return window.matchMedia("(max-width: 720px)").matches;
+    }
 
     function setDropZoneVisible(visible) {
         refs.dropZone.classList.toggle("hidden", !visible);
@@ -90,16 +96,30 @@
 
     function renderPreview() {
         refs.uploadPreview.innerHTML = "";
+        refs.uploadPreview.classList.remove("upload-preview--scrollable");
+        refs.uploadPreview.classList.remove("upload-preview--collapsed");
 
         if (!state.selectedFiles.length) {
             refs.uploadPreview.classList.add("hidden");
+            previewExpanded = false;
             return;
         }
 
         removeStaleUploadStatus();
         refs.uploadPreview.classList.remove("hidden");
+        const shouldCollapse = isCompactViewport() && state.selectedFiles.length > MOBILE_COLLAPSE_LIMIT;
+        const visibleFiles = shouldCollapse && !previewExpanded
+            ? state.selectedFiles.slice(0, MOBILE_COLLAPSE_LIMIT)
+            : state.selectedFiles;
 
-        state.selectedFiles.forEach((file, index) => {
+        if (shouldCollapse && !previewExpanded) {
+            refs.uploadPreview.classList.add("upload-preview--collapsed");
+        }
+        if (shouldCollapse && previewExpanded) {
+            refs.uploadPreview.classList.add("upload-preview--scrollable");
+        }
+
+        visibleFiles.forEach((file) => {
             const status = getUploadStatus(file);
             const percent = Math.max(0, Math.min(100, Math.round(Number(status?.percent) || 0)));
             const uploadedBytes = Math.max(0, Number(status?.uploadedBytes) || 0);
@@ -157,12 +177,34 @@
                     return;
                 }
 
+                const index = state.selectedFiles.findIndex((item) => fileKey(item) === fileKey(file));
+                if (index < 0) {
+                    return;
+                }
                 state.selectedFiles.splice(index, 1);
+                if (state.selectedFiles.length <= MOBILE_COLLAPSE_LIMIT) {
+                    previewExpanded = false;
+                }
                 renderPreview();
             });
 
             refs.uploadPreview.appendChild(chip);
         });
+
+        if (shouldCollapse) {
+            const hiddenCount = Math.max(0, state.selectedFiles.length - MOBILE_COLLAPSE_LIMIT);
+            const toggleButton = document.createElement("button");
+            toggleButton.type = "button";
+            toggleButton.className = "upload-preview__toggle";
+            toggleButton.textContent = previewExpanded
+                ? "Свернуть список"
+                : `Показать еще ${hiddenCount}`;
+            toggleButton.addEventListener("click", () => {
+                previewExpanded = !previewExpanded;
+                renderPreview();
+            });
+            refs.uploadPreview.appendChild(toggleButton);
+        }
     }
 
     function addFiles(filesInput) {
@@ -172,11 +214,15 @@
         }
 
         state.selectedFiles = normalizeFiles(incoming);
+        if (isCompactViewport() && state.selectedFiles.length > MOBILE_COLLAPSE_LIMIT) {
+            previewExpanded = false;
+        }
         renderPreview();
     }
 
     function clearFiles() {
         state.selectedFiles = [];
+        previewExpanded = false;
         uploadProgressByKey.clear();
         refs.fileInput.value = "";
         renderPreview();
@@ -325,6 +371,15 @@
 
         bindDnD();
         bindPaste();
+
+        window.addEventListener("resize", () => {
+            if (!isCompactViewport()) {
+                previewExpanded = true;
+            } else if (state.selectedFiles.length > MOBILE_COLLAPSE_LIMIT) {
+                previewExpanded = false;
+            }
+            renderPreview();
+        });
     }
 
     function attachDependencies(nextDeps) {
