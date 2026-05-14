@@ -1,5 +1,7 @@
 ﻿from typing import Optional
 
+import shutil
+
 from flask import current_app
 
 from app.extensions import db
@@ -11,7 +13,7 @@ from app.models import (
     MessageRead,
     PinnedMessage,
 )
-from app.utils import preview_storage_name, utcnow
+from app.utils import make_storage_filename, preview_storage_name, utcnow
 
 
 class MessageService:
@@ -161,17 +163,67 @@ class MessageService:
         if not source_membership or not target_membership:
             return None, {"error": "Доступ к чату запрещен"}, 403
 
-        attachments_payload = [
-            {
-                "file_name": a.file_name,
-                "stored_name": a.stored_name,
-                "file_url": a.file_url,
-                "mime_type": a.mime_type,
-                "file_size": a.file_size,
-                "kind": a.kind,
-            }
-            for a in source_message.attachments
-        ]
+        attachments_payload = []
+        copied_paths = []
+        upload_folder = current_app.config["FILE_UPLOAD_FOLDER"]
+
+        try:
+            for attachment in source_message.attachments:
+                source_stored_name = (attachment.stored_name or "").strip()
+                if not source_stored_name:
+                    continue
+
+                source_path = upload_folder / source_stored_name
+                if not source_path.exists():
+                    raise FileNotFoundError(source_stored_name)
+
+                seed_name = attachment.file_name or source_stored_name
+                new_stored_name = make_storage_filename(seed_name)
+                target_path = upload_folder / new_stored_name
+                while target_path.exists():
+                    new_stored_name = make_storage_filename(seed_name)
+                    target_path = upload_folder / new_stored_name
+
+                shutil.copy2(source_path, target_path)
+                copied_paths.append(target_path)
+
+                source_preview_name = preview_storage_name(source_stored_name)
+                target_preview_name = preview_storage_name(new_stored_name)
+                if source_preview_name and target_preview_name:
+                    source_preview_path = upload_folder / source_preview_name
+                    target_preview_path = upload_folder / target_preview_name
+                    if source_preview_path.exists():
+                        shutil.copy2(source_preview_path, target_preview_path)
+                        copied_paths.append(target_preview_path)
+
+                file_size = int(target_path.stat().st_size) if target_path.exists() else int(attachment.file_size or 0)
+
+                attachments_payload.append(
+                    {
+                        "file_name": attachment.file_name,
+                        "stored_name": new_stored_name,
+                        "file_url": f"/static/uploads/files/{new_stored_name}",
+                        "mime_type": attachment.mime_type,
+                        "file_size": file_size,
+                        "kind": attachment.kind,
+                    }
+                )
+        except FileNotFoundError:
+            for path in copied_paths:
+                try:
+                    if path.exists():
+                        path.unlink()
+                except Exception:
+                    pass
+            return None, {"error": "Не удалось переслать вложение: исходный файл не найден"}, 409
+        except Exception:
+            for path in copied_paths:
+                try:
+                    if path.exists():
+                        path.unlink()
+                except Exception:
+                    pass
+            return None, {"error": "Не удалось подготовить вложения для пересылки"}, 500
 
         return MessageService.create_message(
             chat_id=target_chat_id,
