@@ -19,6 +19,81 @@
         return deps.chats?.getChatById(state.currentChatId) || null;
     }
 
+    function getPinnedMessages(chat = getCurrentChat()) {
+        if (!chat) {
+            return [];
+        }
+
+        const fromList = Array.isArray(chat.pinned_messages)
+            ? chat.pinned_messages.filter((message) => message && Number.isInteger(Number(message.id)))
+            : [];
+
+        if (fromList.length) {
+            return fromList;
+        }
+
+        if (chat.pinned_message && Number.isInteger(Number(chat.pinned_message.id))) {
+            return [chat.pinned_message];
+        }
+
+        return [];
+    }
+
+    function applyPinnedMessages(chat, messages, preferredMessageId = null) {
+        if (!chat) {
+            return [];
+        }
+
+        const unique = [];
+        const seen = new Set();
+        (Array.isArray(messages) ? messages : []).forEach((message) => {
+            const messageId = Number(message?.id);
+            if (!Number.isInteger(messageId) || seen.has(messageId)) {
+                return;
+            }
+            seen.add(messageId);
+            unique.push(message);
+        });
+
+        chat.pinned_messages = unique;
+        chat.pinned_message = unique[0] || null;
+
+        if (!unique.length) {
+            delete chat._activePinnedIndex;
+            return unique;
+        }
+
+        let nextIndex = 0;
+        if (preferredMessageId) {
+            const preferredId = Number(preferredMessageId);
+            const preferredIndex = unique.findIndex((message) => Number(message.id) === preferredId);
+            if (preferredIndex >= 0) {
+                nextIndex = preferredIndex;
+            }
+        } else {
+            const rawIndex = Number(chat._activePinnedIndex);
+            if (Number.isInteger(rawIndex)) {
+                nextIndex = Math.min(Math.max(rawIndex, 0), unique.length - 1);
+            }
+        }
+
+        chat._activePinnedIndex = nextIndex;
+        return unique;
+    }
+
+    function cyclePinnedBannerMessage() {
+        const chat = getCurrentChat();
+        const pinnedMessages = getPinnedMessages(chat);
+        if (!chat || pinnedMessages.length < 2) {
+            return;
+        }
+
+        const rawIndex = Number(chat._activePinnedIndex);
+        const currentIndex = Number.isInteger(rawIndex) ? Math.min(Math.max(rawIndex, 0), pinnedMessages.length - 1) : 0;
+        chat._activePinnedIndex = (currentIndex + 1) % pinnedMessages.length;
+        helpers.setChatHeader(chat);
+    }
+
     function getChatMessages(chatId) {
         return storage.getMessages(chatId) || [];
     }
@@ -166,8 +241,8 @@
         if (!message) {
             return false;
         }
-        const chat = getCurrentChat();
-        return chat?.pinned_message?.id === message.id;
+        const messageId = Number(message.id);
+        return getPinnedMessages().some((pinned) => Number(pinned.id) === messageId);
     }
 
     function updatePinActionLabel(message) {
@@ -1370,6 +1445,19 @@
 
         setChatMessages(chatId, nextMessages);
 
+        const chat = deps.chats.getChatById(chatId);
+        if (chat) {
+            const currentPinned = getPinnedMessages(chat);
+            const nextPinned = currentPinned.filter((item) => Number(item.id) !== Number(messageId));
+            if (nextPinned.length !== currentPinned.length) {
+                applyPinnedMessages(chat, nextPinned);
+                deps.chats.upsertChat(chat);
+                if (state.currentChatId === chatId) {
+                    helpers.setChatHeader(chat);
+                }
+            }
+        }
+
         if (state.currentChatId === chatId) {
             renderMessages(chatId);
         }
@@ -1386,7 +1474,8 @@
             return;
         }
 
-        chat.pinned_message = payload.message;
+        const nextPinned = [payload.message, ...getPinnedMessages(chat).filter((item) => Number(item.id) !== Number(payload.message.id))];
+        applyPinnedMessages(chat, nextPinned, payload.message.id);
         deps.chats.upsertChat(chat);
 
         if (state.currentChatId === chatId) {
@@ -1401,9 +1490,13 @@
             return;
         }
 
-        if (chat.pinned_message?.id === payload.message_id) {
-            chat.pinned_message = null;
-            deps.chats.upsertChat(chat);
+        const messageId = Number(payload.message_id);
+        const nextPinned = getPinnedMessages(chat).filter((item) => Number(item.id) !== messageId);
+        const previousCurrentId = Number(refs.pinnedWrapper.dataset.messageId);
+        applyPinnedMessages(chat, nextPinned, previousCurrentId === messageId ? null : previousCurrentId);
+
+        deps.chats.upsertChat(chat);
+        if (state.currentChatId === chatId) {
             helpers.setChatHeader(chat);
         }
     }
@@ -1692,7 +1785,15 @@
                 event.preventDefault();
                 event.stopPropagation();
                 pinnedHoldTriggered = false;
+                return;
             }
+
+            if (!refs.pinnedWrapper.dataset.messageId) {
+                return;
+            }
+
+            event.preventDefault();
+            cyclePinnedBannerMessage();
         });
 
         document.addEventListener("visibilitychange", () => {

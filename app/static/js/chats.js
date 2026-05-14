@@ -588,7 +588,10 @@
         upsertChat(chatPayload);
 
         if (state.currentChatId === chatPayload.id) {
-            helpers.setChatHeader(chatPayload);
+            const currentChat = getChatById(chatPayload.id);
+            if (currentChat) {
+                helpers.setChatHeader(currentChat);
+            }
         }
     }
 

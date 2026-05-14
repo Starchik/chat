@@ -189,6 +189,10 @@ class MessageService:
         if not membership:
             return None, {"error": "Доступ к чату запрещен"}, 403
 
+        existing_pin = PinnedMessage.query.filter_by(chat_id=message.chat_id, message_id=message.id).first()
+        if existing_pin:
+            return existing_pin, None, None
+
         pin = PinnedMessage(
             chat_id=message.chat_id,
             message_id=message.id,
@@ -210,7 +214,7 @@ class MessageService:
 
         PinnedMessage.query.filter_by(chat_id=message.chat_id, message_id=message.id).delete()
         db.session.commit()
-        return {"ok": True, "message_id": message_id}, None
+        return {"ok": True, "chat_id": message.chat_id, "message_id": message_id}, None
 
     @staticmethod
     def mark_read(chat_id: int, user_id: int, up_to_message_id: Optional[int] = None):

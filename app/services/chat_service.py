@@ -93,12 +93,14 @@ class ChatService:
                 .count()
             )
 
-        pinned = (
+        pins = (
             PinnedMessage.query
             .filter_by(chat_id=chat.id)
             .order_by(PinnedMessage.created_at.desc())
-            .first()
+            .all()
         )
+        pinned_messages = [pin.message.to_dict() for pin in pins if pin.message]
+        pinned = pinned_messages[0] if pinned_messages else None
 
         payload = chat.to_dict()
         payload.update(
@@ -110,7 +112,8 @@ class ChatService:
                 "member_count": len(members),
                 "unread_count": unread_count,
                 "last_message": last_message.to_dict() if last_message else None,
-                "pinned_message": pinned.message.to_dict() if pinned else None,
+                "pinned_message": pinned,
+                "pinned_messages": pinned_messages,
                 "is_archived": membership.is_archived if membership else False,
                 "last_read_message_id": membership.last_read_message_id if membership else None,
                 "last_read_at": isoformat_or_none(membership.last_read_at) if membership else None,

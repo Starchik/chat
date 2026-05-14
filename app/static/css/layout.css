@@ -118,6 +118,12 @@
     font-size: 0.84rem;
     backdrop-filter: blur(var(--blur-sm));
     transition: background var(--ease), color var(--ease);
+    display: flex;
+    align-items: center;
+    gap: 0.48rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .pinned-banner[data-message-id] {
@@ -134,7 +140,7 @@
     content: "\f08d";
     font-family: "Font Awesome 6 Free";
     font-weight: 900;
-    margin-right: 0.48rem;
+    flex: 0 0 auto;
     color: rgba(147, 223, 255, 0.85);
 }
 

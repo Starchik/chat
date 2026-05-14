@@ -299,6 +299,45 @@ function toggleTheme() {
 }
 
 function setChatHeader(chat) {
+    const clearPinnedBanner = () => {
+        refs.pinnedWrapper.classList.add("hidden");
+        refs.pinnedWrapper.textContent = "";
+        delete refs.pinnedWrapper.dataset.messageId;
+        delete refs.pinnedWrapper.dataset.pinnedIndex;
+        delete refs.pinnedWrapper.dataset.pinnedCount;
+        refs.pinnedWrapper.removeAttribute("title");
+    };
+
+    const summarizePinnedMessage = (message) => {
+        if (!message) {
+            return "Вложение";
+        }
+
+        if (message.is_deleted) {
+            return "Удаленное сообщение";
+        }
+
+        if (message.content && message.content.trim()) {
+            return message.content;
+        }
+
+        if (Array.isArray(message.attachments) && message.attachments.length > 0) {
+            const first = message.attachments[0];
+            if (first?.kind === "image") {
+                return "Фото";
+            }
+            if (first?.kind === "video") {
+                return "Видео";
+            }
+            if (first?.kind === "audio") {
+                return "Аудио";
+            }
+            return "Файл";
+        }
+
+        return "Вложение";
+    };
+
     if (!chat) {
         refs.chatAvatar.src = avatarFallback("Chat", true);
         refs.chatTitle.textContent = "Выберите чат";
@@ -314,10 +353,7 @@ function setChatHeader(chat) {
         }
         updateChatArchiveAction(null);
         closeChatActionsMenu();
-        refs.pinnedWrapper.classList.add("hidden");
-        refs.pinnedWrapper.textContent = "";
-        delete refs.pinnedWrapper.dataset.messageId;
-        refs.pinnedWrapper.removeAttribute("title");
+        clearPinnedBanner();
         return;
     }
 
@@ -341,17 +377,28 @@ function setChatHeader(chat) {
         refs.chatSubtitle.textContent = chat.online ? "в сети" : "не в сети";
     }
 
-    if (chat.pinned_message) {
-        refs.pinnedWrapper.classList.remove("hidden");
-        refs.pinnedWrapper.textContent = `Закреплено: ${chat.pinned_message.content || "Вложение"}`;
-        refs.pinnedWrapper.dataset.messageId = String(chat.pinned_message.id);
-        refs.pinnedWrapper.title = "Зажмите, чтобы перейти к сообщению";
-    } else {
-        refs.pinnedWrapper.classList.add("hidden");
-        refs.pinnedWrapper.textContent = "";
-        delete refs.pinnedWrapper.dataset.messageId;
-        refs.pinnedWrapper.removeAttribute("title");
+    const pinnedMessages = Array.isArray(chat.pinned_messages)
+        ? chat.pinned_messages.filter((message) => message && Number.isInteger(Number(message.id)))
+        : (chat.pinned_message ? [chat.pinned_message] : []);
+
+    if (!pinnedMessages.length) {
+        clearPinnedBanner();
+        return;
     }
+
+    const maxIndex = pinnedMessages.length - 1;
+    const currentIndexRaw = Number(chat._activePinnedIndex);
+    const currentIndex = Number.isInteger(currentIndexRaw) ? Math.min(Math.max(currentIndexRaw, 0), maxIndex) : 0;
+    const currentPinned = pinnedMessages[currentIndex];
+
+    chat._activePinnedIndex = currentIndex;
+
+    refs.pinnedWrapper.classList.remove("hidden");
+    refs.pinnedWrapper.textContent = `Закреплено ${currentIndex + 1}/${pinnedMessages.length}: ${summarizePinnedMessage(currentPinned)}`;
+    refs.pinnedWrapper.dataset.messageId = String(currentPinned.id);
+    refs.pinnedWrapper.dataset.pinnedIndex = String(currentIndex);
+    refs.pinnedWrapper.dataset.pinnedCount = String(pinnedMessages.length);
+    refs.pinnedWrapper.title = "Тап: следующий закреп • Зажмите, чтобы перейти к сообщению";
 }
 
 function setMessagesEmptyState(visible) {
