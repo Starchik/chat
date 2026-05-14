@@ -1,4 +1,4 @@
-export function initCallsModule(app) {
+﻿export function initCallsModule(app) {
     const { refs, state, helpers, config } = app;
 
     const deps = {
@@ -28,33 +28,44 @@ export function initCallsModule(app) {
     };
 
     const defaultStatusByPhase = {
-        ringing_out: "Ожидание ответа...",
-        ringing_in: "Входящий вызов",
-        connecting: "Подключение...",
-        active: "Соединение установлено",
+        ringing_out: "РћР¶РёРґР°РЅРёРµ РѕС‚РІРµС‚Р°...",
+        ringing_in: "Р’С…РѕРґСЏС‰РёР№ РІС‹Р·РѕРІ",
+        connecting: "РџРѕРґРєР»СЋС‡РµРЅРёРµ...",
+        active: "РЎРѕРµРґРёРЅРµРЅРёРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ",
     };
 
     const reasonText = {
-        rejected: "Звонок отклонен",
-        busy: "Пользователь занят",
-        offline: "Пользователь офлайн",
-        ended: "Звонок завершен",
-        disconnected: "Собеседник отключился",
-        timeout: "Время ожидания истекло",
-        failed: "Ошибка соединения",
-        unsupported: "Звонки не поддерживаются в этом браузере",
+        rejected: "Р—РІРѕРЅРѕРє РѕС‚РєР»РѕРЅРµРЅ",
+        busy: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ Р·Р°РЅСЏС‚",
+        offline: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС„Р»Р°Р№РЅ",
+        ended: "Р—РІРѕРЅРѕРє Р·Р°РІРµСЂС€РµРЅ",
+        disconnected: "РЎРѕР±РµСЃРµРґРЅРёРє РѕС‚РєР»СЋС‡РёР»СЃСЏ",
+        timeout: "Р’СЂРµРјСЏ РѕР¶РёРґР°РЅРёСЏ РёСЃС‚РµРєР»Рѕ",
+        failed: "РћС€РёР±РєР° СЃРѕРµРґРёРЅРµРЅРёСЏ",
+        unsupported: "Р—РІРѕРЅРєРё РЅРµ РїРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ РІ СЌС‚РѕРј Р±СЂР°СѓР·РµСЂРµ",
         insecure_context: "\u0414\u043b\u044f \u0437\u0432\u043e\u043d\u043a\u043e\u0432 \u043d\u0443\u0436\u0435\u043d HTTPS (\u0438\u043b\u0438 localhost)",
     };
 
     const ringtonePatterns = {
         incoming: [
-            { frequency: 523.25, duration: 0.2 },
-            { frequency: 659.25, duration: 0.18 },
-            { frequency: 783.99, duration: 0.22 },
-            { frequency: null, duration: 0.24 },
-            { frequency: 659.25, duration: 0.2 },
-            { frequency: 880.0, duration: 0.24 },
-            { frequency: null, duration: 0.72 },
+            { frequency: 659.25, duration: 0.16 },
+            { frequency: 830.61, duration: 0.14 },
+            { frequency: 987.77, duration: 0.18 },
+            { frequency: 1318.51, duration: 0.22 },
+            { frequency: null, duration: 0.18 },
+            { frequency: 987.77, duration: 0.16 },
+            { frequency: 830.61, duration: 0.16 },
+            { frequency: 659.25, duration: 0.22 },
+            { frequency: null, duration: 0.54 },
+            { frequency: 739.99, duration: 0.16 },
+            { frequency: 880.0, duration: 0.14 },
+            { frequency: 1108.73, duration: 0.18 },
+            { frequency: 1479.98, duration: 0.22 },
+            { frequency: null, duration: 0.2 },
+            { frequency: 1108.73, duration: 0.16 },
+            { frequency: 880.0, duration: 0.16 },
+            { frequency: 739.99, duration: 0.24 },
+            { frequency: null, duration: 0.66 },
         ],
         outgoing: [
             { frequency: 392.0, duration: 0.12 },
@@ -174,7 +185,7 @@ export function initCallsModule(app) {
 
         return {
             url: String(config.webrtcRingtoneIncomingUrl || "").trim(),
-            volume: clampVolume(config.webrtcRingtoneIncomingVolume, 0.88),
+            volume: clampVolume(config.webrtcRingtoneIncomingVolume, 0.70),
         };
     }
 
@@ -530,7 +541,7 @@ export function initCallsModule(app) {
 
         const icon = callRefs.muteBtn.querySelector("i");
         callRefs.muteBtn.classList.toggle("is-active", Boolean(currentCall?.isMuted));
-        callRefs.muteBtn.setAttribute("aria-label", currentCall?.isMuted ? "Включить микрофон" : "Выключить микрофон");
+        callRefs.muteBtn.setAttribute("aria-label", currentCall?.isMuted ? "Р’РєР»СЋС‡РёС‚СЊ РјРёРєСЂРѕС„РѕРЅ" : "Р’С‹РєР»СЋС‡РёС‚СЊ РјРёРєСЂРѕС„РѕРЅ");
 
         if (icon) {
             icon.className = currentCall?.isMuted
@@ -549,7 +560,7 @@ export function initCallsModule(app) {
         const enabled = Boolean(isVideoCall && localStream);
         callRefs.cameraBtn.disabled = !enabled;
         callRefs.cameraBtn.classList.toggle("is-active", Boolean(currentCall?.isCameraOff));
-        callRefs.cameraBtn.setAttribute("aria-label", currentCall?.isCameraOff ? "Включить камеру" : "Выключить камеру");
+        callRefs.cameraBtn.setAttribute("aria-label", currentCall?.isCameraOff ? "Р’РєР»СЋС‡РёС‚СЊ РєР°РјРµСЂСѓ" : "Р’С‹РєР»СЋС‡РёС‚СЊ РєР°РјРµСЂСѓ");
 
         if (icon) {
             icon.className = currentCall?.isCameraOff
@@ -570,10 +581,10 @@ export function initCallsModule(app) {
         }
 
         if (callRefs.modeBadge) {
-            callRefs.modeBadge.textContent = currentCall.kind === "video" ? "Видеозвонок" : "Аудиозвонок";
+            callRefs.modeBadge.textContent = currentCall.kind === "video" ? "Р’РёРґРµРѕР·РІРѕРЅРѕРє" : "РђСѓРґРёРѕР·РІРѕРЅРѕРє";
         }
         if (callRefs.peerName) {
-            callRefs.peerName.textContent = currentCall.peerName || "Пользователь";
+            callRefs.peerName.textContent = currentCall.peerName || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ";
         }
         if (callRefs.peerAvatar) {
             callRefs.peerAvatar.src = currentCall.peerAvatar || helpers.avatarFallback(currentCall.peerName || "User");
@@ -640,7 +651,7 @@ export function initCallsModule(app) {
         if (!chat) {
             return {
                 userId: fallback.userId || null,
-                name: fallback.name || "Пользователь",
+                name: fallback.name || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ",
                 avatarUrl: fallback.avatarUrl || "",
                 isGroup: false,
             };
@@ -649,7 +660,7 @@ export function initCallsModule(app) {
         if (chat.is_group) {
             return {
                 userId: fallback.userId || null,
-                name: fallback.name || chat.title || "Группа",
+                name: fallback.name || chat.title || "Р“СЂСѓРїРїР°",
                 avatarUrl: fallback.avatarUrl || chat.avatar_url || "",
                 isGroup: true,
             };
@@ -658,7 +669,7 @@ export function initCallsModule(app) {
         const peer = (chat.members || []).find((member) => member.id !== state.me?.id);
         return {
             userId: peer?.id || fallback.userId || null,
-            name: peer?.display_name || chat.title || fallback.name || "Пользователь",
+            name: peer?.display_name || chat.title || fallback.name || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ",
             avatarUrl: peer?.avatar_url || chat.avatar_url || fallback.avatarUrl || "",
             isGroup: false,
         };
@@ -824,41 +835,41 @@ export function initCallsModule(app) {
         }
 
         if (!deps.socket?.isConnected()) {
-            helpers.showToast("Realtime-соединение еще не установлено");
+            helpers.showToast("Realtime-СЃРѕРµРґРёРЅРµРЅРёРµ РµС‰Рµ РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ");
             return;
         }
 
         if (currentCall) {
-            helpers.showToast("Звонок уже выполняется");
+            helpers.showToast("Р—РІРѕРЅРѕРє СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ");
             return;
         }
 
         if (!state.currentChatId) {
-            helpers.showToast("Сначала выберите чат");
+            helpers.showToast("РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ С‡Р°С‚");
             return;
         }
 
         const chat = deps.chats?.getChatById(state.currentChatId);
         if (!chat) {
-            helpers.showToast("Чат не найден");
+            helpers.showToast("Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ");
             return;
         }
 
         if (chat.is_group) {
-            helpers.showToast("Групповые звонки пока не поддерживаются");
+            helpers.showToast("Р“СЂСѓРїРїРѕРІС‹Рµ Р·РІРѕРЅРєРё РїРѕРєР° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ");
             return;
         }
 
         const peer = resolvePeerByChat(chat.id);
         if (!peer.userId) {
-            helpers.showToast("Не удалось определить собеседника");
+            helpers.showToast("РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ СЃРѕР±РµСЃРµРґРЅРёРєР°");
             return;
         }
 
         try {
             localStream = await acquireLocalStream(kind);
         } catch (error) {
-            helpers.showToast("Нет доступа к микрофону/камере");
+            helpers.showToast("РќРµС‚ РґРѕСЃС‚СѓРїР° Рє РјРёРєСЂРѕС„РѕРЅСѓ/РєР°РјРµСЂРµ");
             return;
         }
 
@@ -940,7 +951,7 @@ export function initCallsModule(app) {
             });
             await finishCall({
                 reason: "failed",
-                toast: "Нет доступа к микрофону/камере",
+                toast: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє РјРёРєСЂРѕС„РѕРЅСѓ/РєР°РјРµСЂРµ",
             });
             return;
         }
@@ -1069,7 +1080,7 @@ export function initCallsModule(app) {
 
         const peer = resolvePeerByChat(payload.chat_id, {
             userId: payload.from_user_id || null,
-            name: payload.from_display_name || "Пользователь",
+            name: payload.from_display_name || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ",
             avatarUrl: "",
         });
 
@@ -1233,3 +1244,4 @@ export function initCallsModule(app) {
         onSocketCallError: handleSocketCallError,
     };
 }
+
