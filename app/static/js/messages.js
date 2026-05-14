@@ -296,7 +296,8 @@
 
     function renderAttachment(attachment) {
         const mediaKind = detectAttachmentKind(attachment);
-        const fileName = helpers.escapeHtml(attachment.file_name || "Файл");
+        const rawFileName = String(attachment.file_name || "\u0424\u0430\u0439\u043b");
+        const fileName = helpers.escapeHtml(rawFileName);
         const rawFileUrl = String(attachment.file_url || "#");
         const rawPreviewUrl = String(attachment.preview_url || rawFileUrl);
         const fileUrl = helpers.escapeHtml(rawFileUrl);
@@ -341,6 +342,10 @@
         }
 
         if (mediaKind === "audio") {
+            const isVoiceClipName = /^voice-\d{6}\.(webm|ogg|m4a|wav|mp3|aac|opus)$/i.test(rawFileName);
+            const audioCaption = isVoiceClipName
+                ? "\u0413\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0435 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435"
+                : fileName;
             return `
                 <div class="message__file message__file--audio">
                     <audio class="message__audio" controls preload="metadata">
@@ -348,7 +353,7 @@
                     </audio>
                     <a class="message__audio-download" href="${fileUrl}" target="_blank" rel="noopener noreferrer">
                         <i class="fa-solid fa-music"></i>
-                        <span>${fileName}</span>
+                        <span>${audioCaption}</span>
                     </a>
                 </div>
             `;
