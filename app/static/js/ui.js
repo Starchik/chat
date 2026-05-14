@@ -45,6 +45,7 @@ const refs = {
     messagesList: document.getElementById("messages-list"),
     chatEmpty: document.getElementById("chat-empty"),
     typingIndicator: document.getElementById("typing-indicator"),
+    scrollToLatestBtn: document.getElementById("scroll-to-latest-btn"),
 
     replyPreview: document.getElementById("reply-preview"),
     composer: document.getElementById("composer"),

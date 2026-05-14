@@ -147,6 +147,7 @@
 
     function scrollToBottom(smooth = false) {
         autoScrollEnabled = true;
+        updateScrollToLatestButton(true);
         refs.messagesScroll.scrollTo({
             top: refs.messagesScroll.scrollHeight,
             behavior: smooth ? "smooth" : "auto",
@@ -159,6 +160,22 @@
 
     function updateAutoScrollState() {
         autoScrollEnabled = isNearBottom();
+        updateScrollToLatestButton();
+    }
+
+    function updateScrollToLatestButton(forceHide = false) {
+        if (!refs.scrollToLatestBtn) {
+            return;
+        }
+
+        if (forceHide || !state.currentChatId) {
+            refs.scrollToLatestBtn.classList.add("hidden");
+            return;
+        }
+
+        const hasOverflow = refs.messagesScroll.scrollHeight - refs.messagesScroll.clientHeight > 56;
+        const shouldShow = hasOverflow && !isNearBottom(72);
+        refs.scrollToLatestBtn.classList.toggle("hidden", !shouldShow);
     }
 
     function isChatVisibleForRead() {
@@ -1125,6 +1142,7 @@
 
         helpers.setMessagesEmptyState(messages.length === 0);
         renderTypingIndicator();
+        updateScrollToLatestButton();
     }
 
     function setReplyPreview(message) {
@@ -1543,6 +1561,7 @@
 
         refs.messagesList.innerHTML = "";
         helpers.setMessagesEmptyState(cachedMessages.length === 0);
+        updateScrollToLatestButton(true);
 
         if (cachedMessages.length) {
             renderMessages(chatId);
@@ -1556,6 +1575,7 @@
         ensureLazyState(chatId);
 
         await loadMessages(chatId, { before: null, appendToTop: false });
+        updateAutoScrollState();
 
         if (chat?.last_message?.id) {
             await markRead(chatId, chat.last_message.id);
@@ -1576,6 +1596,8 @@
 
             if (shouldScroll) {
                 scrollToBottom(true);
+            } else {
+                updateAutoScrollState();
             }
 
             if (message.sender_id !== state.me.id && isChatVisibleForRead()) {
@@ -1604,6 +1626,7 @@
 
         if (state.currentChatId === message.chat_id) {
             renderMessages(message.chat_id);
+            updateAutoScrollState();
         }
     }
 
@@ -1635,6 +1658,7 @@
 
         if (state.currentChatId === chatId) {
             renderMessages(chatId);
+            updateAutoScrollState();
         }
     }
 
@@ -1706,6 +1730,7 @@
 
         if (state.currentChatId === chatId) {
             renderMessages(chatId);
+            updateAutoScrollState();
         }
     }
 
@@ -1914,6 +1939,11 @@
             void handleScrollTopLoad();
         });
 
+        refs.scrollToLatestBtn?.addEventListener("click", () => {
+            scrollToBottom(true);
+            syncCurrentChatRead();
+        });
+
         refs.messagesList.addEventListener("pointermove", handleMessageCursorGlow);
         refs.messagesList.addEventListener("pointerleave", clearMessageCursorGlow);
         refs.messagesList.addEventListener("pointercancel", clearMessageCursorGlow);
@@ -2003,6 +2033,7 @@
         bindEmojiPanel();
         autoResizeInput();
         updateAutoScrollState();
+        updateScrollToLatestButton(true);
         ensureNotificationPermissionOnInteraction();
     }
 

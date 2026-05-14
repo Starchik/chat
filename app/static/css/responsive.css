@@ -151,6 +151,13 @@
         height: 42px;
     }
 
+    .scroll-latest-fab {
+        right: 0.74rem;
+        bottom: 4.95rem;
+        width: 41px;
+        height: 41px;
+    }
+
     .toast-stack {
         left: 0.72rem;
         right: 0.72rem;
@@ -215,6 +222,11 @@
     .fab-new-chat {
         right: 0.72rem;
         bottom: 0.72rem;
+    }
+
+    .scroll-latest-fab {
+        right: 0.62rem;
+        bottom: 4.65rem;
     }
 
     .call-overlay {

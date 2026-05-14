@@ -956,6 +956,36 @@
     background: linear-gradient(135deg, rgba(243, 87, 122, 0.96), rgba(230, 72, 98, 0.9));
 }
 
+.scroll-latest-fab {
+    position: absolute;
+    z-index: 22;
+    right: 1rem;
+    bottom: 5.35rem;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(134, 219, 255, 0.64);
+    background: color-mix(in oklab, var(--surface-control-icon) 85%, rgba(35, 137, 237, 0.25));
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    backdrop-filter: blur(var(--blur-sm));
+    box-shadow: 0 12px 30px rgba(8, 24, 52, 0.35);
+    transition: transform var(--ease), box-shadow var(--ease), border-color var(--ease), background var(--ease);
+}
+
+.scroll-latest-fab:hover {
+    transform: translateY(-1px);
+    border-color: rgba(157, 220, 255, 0.82);
+    box-shadow: 0 16px 34px rgba(12, 38, 80, 0.42);
+    background: color-mix(in oklab, var(--surface-control-icon) 78%, rgba(44, 150, 255, 0.33));
+}
+
+.scroll-latest-fab:active {
+    transform: translateY(0) scale(0.98);
+}
+
 .call-expand-fab {
     position: fixed;
     z-index: 208;
