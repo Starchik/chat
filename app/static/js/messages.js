@@ -289,14 +289,14 @@
         const safeName = helpers.escapeHtml(name || "Файл");
         const safeUrl = helpers.escapeHtml(url);
         const safeMime = helpers.escapeHtml(mimeType);
-        const isZoomable = kind === "image" || kind === "video";
+        const isZoomable = kind === "image";
 
         let content = "";
         if (kind === "image") {
             content = `<img class="media-preview__image media-preview__zoom-target" src="${safeUrl}" alt="${safeName}" />`;
         } else if (kind === "video") {
             content = `
-                <video class="media-preview__video media-preview__zoom-target" controls autoplay playsinline preload="metadata">
+                <video class="media-preview__video" controls autoplay playsinline preload="metadata">
                     <source src="${safeUrl}" type="${safeMime}" />
                 </video>
             `;
@@ -311,28 +311,12 @@
             `;
         }
 
-        const zoomControls = isZoomable
-            ? `
-                <div class="media-preview__zoom-controls">
-                    <button id="media-zoom-out" class="icon-btn" type="button" aria-label="Уменьшить">−</button>
-                    <button id="media-zoom-reset" class="btn btn-soft media-preview__zoom-reset" type="button">100%</button>
-                    <button id="media-zoom-in" class="icon-btn" type="button" aria-label="Увеличить">+</button>
-                </div>
-            `
-            : "";
-
         helpers.showModal(`
             <div class="media-preview">
-                <div class="media-preview__head">
-                    <div class="media-preview__name">${safeName}</div>
-                    <div class="media-preview__actions">
-                        ${zoomControls}
-                        <button id="media-preview-close" class="icon-btn" type="button" aria-label="Закрыть">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="media-preview__body">
+                <button id="media-preview-close" class="icon-btn media-preview__close" type="button" aria-label="Закрыть">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="media-preview__body${isZoomable ? " media-preview__body--zoomable" : ""}">
                     ${content}
                 </div>
             </div>
@@ -346,22 +330,21 @@
                 return;
             }
 
-            const zoomOutButton = document.getElementById("media-zoom-out");
-            const zoomResetButton = document.getElementById("media-zoom-reset");
-            const zoomInButton = document.getElementById("media-zoom-in");
             const zoomTarget = document.querySelector(".media-preview__zoom-target");
             const zoomBody = document.querySelector(".media-preview__body");
 
-            if (!zoomOutButton || !zoomResetButton || !zoomInButton || !zoomTarget || !zoomBody) {
+            if (!zoomTarget || !zoomBody) {
                 return;
             }
 
             const minScale = 1;
             const maxScale = 4;
-            const zoomStep = 0.25;
+            const zoomStep = 0.2;
             let scale = 1;
             let baseWidth = 0;
             const isImageTarget = zoomTarget.tagName === "IMG";
+            let pinchStartDistance = 0;
+            let pinchStartScale = 1;
 
             let isDragging = false;
             let dragPointerId = null;
@@ -407,12 +390,6 @@
                 }
             };
 
-            const updateControls = () => {
-                zoomOutButton.disabled = scale <= minScale + 0.001;
-                zoomInButton.disabled = scale >= maxScale - 0.001;
-                zoomResetButton.textContent = `${Math.round(scale * 100)}%`;
-            };
-
             const applyZoom = () => {
                 if (scale <= minScale + 0.001) {
                     zoomTarget.style.width = "";
@@ -421,13 +398,11 @@
                     zoomBody.scrollLeft = 0;
                     zoomBody.scrollTop = 0;
                     updatePanState();
-                    updateControls();
                     return;
                 }
 
                 setBaseWidth();
                 if (baseWidth <= 0) {
-                    updateControls();
                     return;
                 }
 
@@ -435,23 +410,12 @@
                 zoomTarget.style.maxHeight = "none";
                 zoomTarget.style.width = `${Math.round(baseWidth * scale)}px`;
                 updatePanState();
-                updateControls();
             };
 
             const changeScale = (nextScale) => {
                 scale = Math.min(maxScale, Math.max(minScale, nextScale));
                 applyZoom();
             };
-
-            zoomInButton.addEventListener("click", () => {
-                changeScale(scale + zoomStep);
-            });
-            zoomOutButton.addEventListener("click", () => {
-                changeScale(scale - zoomStep);
-            });
-            zoomResetButton.addEventListener("click", () => {
-                changeScale(1);
-            });
 
             zoomBody.addEventListener("wheel", (event) => {
                 event.preventDefault();
@@ -468,6 +432,69 @@
             });
 
             if (isImageTarget) {
+                const getTouchDistance = (touches) => {
+                    if (!touches || touches.length < 2) {
+                        return 0;
+                    }
+
+                    const dx = touches[0].clientX - touches[1].clientX;
+                    const dy = touches[0].clientY - touches[1].clientY;
+                    return Math.hypot(dx, dy);
+                };
+
+                const beginPinch = (event) => {
+                    if (event.touches.length !== 2) {
+                        return;
+                    }
+                    const distance = getTouchDistance(event.touches);
+                    if (distance <= 0) {
+                        return;
+                    }
+                    pinchStartDistance = distance;
+                    pinchStartScale = scale;
+                };
+
+                zoomBody.addEventListener("touchstart", (event) => {
+                    if (event.touches.length === 2) {
+                        beginPinch(event);
+                        event.preventDefault();
+                    }
+                }, { passive: false });
+
+                zoomBody.addEventListener("touchmove", (event) => {
+                    if (event.touches.length !== 2 || pinchStartDistance <= 0) {
+                        return;
+                    }
+                    const distance = getTouchDistance(event.touches);
+                    if (distance <= 0) {
+                        return;
+                    }
+                    const factor = distance / pinchStartDistance;
+                    changeScale(pinchStartScale * factor);
+                    event.preventDefault();
+                }, { passive: false });
+
+                zoomBody.addEventListener("touchend", (event) => {
+                    if (event.touches.length >= 2) {
+                        return;
+                    }
+                    pinchStartDistance = 0;
+                });
+
+                zoomBody.addEventListener("touchcancel", () => {
+                    pinchStartDistance = 0;
+                });
+
+                zoomBody.addEventListener("gesturestart", (event) => {
+                    event.preventDefault();
+                });
+                zoomBody.addEventListener("gesturechange", (event) => {
+                    event.preventDefault();
+                });
+                zoomBody.addEventListener("gestureend", (event) => {
+                    event.preventDefault();
+                });
+
                 zoomTarget.draggable = false;
                 zoomTarget.addEventListener("dragstart", (event) => {
                     event.preventDefault();
@@ -528,17 +555,8 @@
                 }, { once: true });
             }
 
-            if (zoomTarget.tagName === "VIDEO") {
-                zoomTarget.addEventListener("loadedmetadata", () => {
-                    baseWidth = 0;
-                    setBaseWidth();
-                    applyZoom();
-                }, { once: true });
-            }
-
             setBaseWidth();
             updatePanState();
-            updateControls();
         });
     }
 
