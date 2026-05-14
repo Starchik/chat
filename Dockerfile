@@ -18,4 +18,4 @@ RUN chmod +x /app/start.sh
 
 EXPOSE 5000
 
-CMD ["/app/start.sh"]
+CMD ["/bin/sh", "/app/start.sh"]

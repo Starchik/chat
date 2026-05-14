@@ -118,6 +118,24 @@ docker compose logs -f coturn
 docker compose restart
 ```
 
+## Cloudflared (Tunnel)
+
+Для сценария с Cloudflare Tunnel не нужно править `docker-compose.yml` вручную:
+
+1. Поднимите только приложение:
+
+```bash
+docker compose up -d --build messenger
+```
+
+2. Проверьте локальный endpoint:
+
+```bash
+curl http://127.0.0.1:5000/health
+```
+
+`messenger` уже публикуется как `127.0.0.1:5000->5000/tcp`, поэтому `cloudflared` можно направлять на `http://127.0.0.1:5000`.
+
 ## Примечания по безопасности
 
 - Обязательно смените все секреты из `.env.example`.
