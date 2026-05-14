@@ -353,9 +353,30 @@
                 : fileName;
             return `
                 <div class="message__file message__file--audio">
-                    <audio class="message__audio" controls preload="metadata">
-                        <source src="${fileUrl}" type="${mime}" />
-                    </audio>
+                    <div class="message__audio-player" data-audio-player>
+                        <audio class="message__audio-source" preload="metadata">
+                            <source src="${fileUrl}" type="${mime}" />
+                        </audio>
+                        <button class="message__audio-toggle" type="button" data-audio-toggle aria-label="Воспроизвести">
+                            <i class="fa-solid fa-play"></i>
+                        </button>
+                        <div class="message__audio-main">
+                            <input
+                                class="message__audio-seek"
+                                type="range"
+                                min="0"
+                                max="1000"
+                                step="1"
+                                value="0"
+                                data-audio-seek
+                                aria-label="Перемотка аудио"
+                            />
+                            <div class="message__audio-time">
+                                <span data-audio-current>0:00</span>
+                                <span data-audio-duration>0:00</span>
+                            </div>
+                        </div>
+                    </div>
                     <a class="message__audio-download" href="${fileUrl}" target="_blank" rel="noopener noreferrer">
                         <i class="fa-solid fa-music"></i>
                         <span>${audioCaption}</span>
@@ -410,6 +431,134 @@
         }
 
         return "file";
+    }
+
+    function formatAudioTime(seconds) {
+        const totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const remainderSeconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainderSeconds).padStart(2, "0")}`;
+        }
+
+        return `${minutes}:${String(remainderSeconds).padStart(2, "0")}`;
+    }
+
+    function setAudioToggleState(button, isPlaying) {
+        if (!button) {
+            return;
+        }
+
+        const icon = button.querySelector("i");
+        button.dataset.state = isPlaying ? "playing" : "paused";
+        button.setAttribute("aria-label", isPlaying ? "Пауза" : "Воспроизвести");
+
+        if (icon) {
+            icon.className = isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play";
+        }
+    }
+
+    function bindAudioPlayers(scope = refs.messagesList) {
+        const players = scope.querySelectorAll("[data-audio-player]");
+        if (!players.length) {
+            return;
+        }
+
+        players.forEach((player) => {
+            if (player.dataset.bound === "1") {
+                return;
+            }
+
+            const audio = player.querySelector("audio");
+            const toggleButton = player.querySelector("[data-audio-toggle]");
+            const seekInput = player.querySelector("[data-audio-seek]");
+            const currentLabel = player.querySelector("[data-audio-current]");
+            const durationLabel = player.querySelector("[data-audio-duration]");
+
+            if (!audio || !toggleButton || !seekInput || !currentLabel || !durationLabel) {
+                return;
+            }
+
+            let isSeeking = false;
+
+            const syncUi = () => {
+                const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+                const currentTime = Number.isFinite(audio.currentTime) ? Math.max(0, audio.currentTime) : 0;
+
+                if (!isSeeking) {
+                    const progress = duration > 0 ? Math.round((currentTime / duration) * 1000) : 0;
+                    seekInput.value = String(Math.max(0, Math.min(1000, progress)));
+                }
+
+                currentLabel.textContent = formatAudioTime(currentTime);
+                durationLabel.textContent = formatAudioTime(duration);
+                setAudioToggleState(toggleButton, !audio.paused && !audio.ended);
+            };
+
+            const applySeek = () => {
+                const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+                if (duration <= 0) {
+                    return;
+                }
+                const ratio = Number(seekInput.value) / 1000;
+                audio.currentTime = duration * Math.max(0, Math.min(1, ratio));
+            };
+
+            toggleButton.addEventListener("click", () => {
+                if (audio.paused || audio.ended) {
+                    const allAudio = refs.messagesList.querySelectorAll("[data-audio-player] audio");
+                    allAudio.forEach((node) => {
+                        if (node !== audio) {
+                            node.pause();
+                        }
+                    });
+                    void audio.play().catch(() => {});
+                } else {
+                    audio.pause();
+                }
+            });
+
+            seekInput.addEventListener("pointerdown", () => {
+                isSeeking = true;
+            });
+            seekInput.addEventListener("pointerup", () => {
+                applySeek();
+                isSeeking = false;
+                syncUi();
+            });
+            seekInput.addEventListener("input", () => {
+                applySeek();
+                syncUi();
+            });
+            seekInput.addEventListener("change", () => {
+                applySeek();
+                isSeeking = false;
+                syncUi();
+            });
+
+            audio.addEventListener("play", () => {
+                const allAudio = refs.messagesList.querySelectorAll("[data-audio-player] audio");
+                allAudio.forEach((node) => {
+                    if (node !== audio) {
+                        node.pause();
+                    }
+                });
+                syncUi();
+            });
+            audio.addEventListener("pause", syncUi);
+            audio.addEventListener("ended", () => {
+                isSeeking = false;
+                syncUi();
+            });
+            audio.addEventListener("timeupdate", syncUi);
+            audio.addEventListener("loadedmetadata", syncUi);
+            audio.addEventListener("durationchange", syncUi);
+
+            player.dataset.bound = "1";
+            syncUi();
+        });
     }
 
     function splitAttachmentBlocks(attachments = []) {
@@ -1203,6 +1352,7 @@
         });
 
         helpers.setMessagesEmptyState(messages.length === 0);
+        bindAudioPlayers(refs.messagesList);
         renderTypingIndicator();
         updateScrollToLatestButton();
     }
