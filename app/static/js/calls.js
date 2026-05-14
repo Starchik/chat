@@ -79,6 +79,11 @@ export function initCallsModule(app) {
     let ringtoneLoopTimerId = null;
     let ringtoneUnlockHandlersBound = false;
     let pendingRingtoneDirection = null;
+    let activeRingtoneAudio = null;
+    const ringtoneAudioByDirection = {
+        incoming: null,
+        outgoing: null,
+    };
 
     function getPeerConnectionCtor() {
         return window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || null;
@@ -152,6 +157,52 @@ export function initCallsModule(app) {
         }
     }
 
+    function clampVolume(value, fallback) {
+        const normalized = Number(value);
+        if (!Number.isFinite(normalized)) {
+            return fallback;
+        }
+        return Math.max(0, Math.min(1, normalized));
+    }
+
+    function getRingtoneAssetConfig(direction = "incoming") {
+        if (direction === "outgoing") {
+            return {
+                url: String(config.webrtcRingtoneOutgoingUrl || "").trim(),
+                volume: clampVolume(config.webrtcRingtoneOutgoingVolume, 0.72),
+            };
+        }
+
+        return {
+            url: String(config.webrtcRingtoneIncomingUrl || "").trim(),
+            volume: clampVolume(config.webrtcRingtoneIncomingVolume, 0.88),
+        };
+    }
+
+    function getOrCreateRingtoneAudio(direction = "incoming") {
+        const key = direction === "outgoing" ? "outgoing" : "incoming";
+        const { url, volume } = getRingtoneAssetConfig(key);
+        if (!url) {
+            return null;
+        }
+
+        const existingAudio = ringtoneAudioByDirection[key];
+        if (existingAudio && existingAudio.dataset?.sourceUrl === url) {
+            existingAudio.volume = volume;
+            return existingAudio;
+        }
+
+        const nextAudio = new Audio(url);
+        nextAudio.loop = true;
+        nextAudio.preload = "auto";
+        nextAudio.playsInline = true;
+        nextAudio.volume = volume;
+        nextAudio.dataset.sourceUrl = url;
+
+        ringtoneAudioByDirection[key] = nextAudio;
+        return nextAudio;
+    }
+
     function ensureRingtoneContext() {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) {
@@ -176,34 +227,96 @@ export function initCallsModule(app) {
     }
 
     function unlockRingtoneAudio() {
+        let unlocked = false;
         const context = ensureRingtoneContext();
-        if (!context) {
-            return false;
+        if (context) {
+            if (context.state !== "running") {
+                context.resume().catch(() => {});
+            }
+
+            try {
+                const oscillator = context.createOscillator();
+                const gainNode = context.createGain();
+                gainNode.gain.value = 0.00001;
+                oscillator.connect(gainNode);
+                gainNode.connect(context.destination);
+                oscillator.start();
+                oscillator.stop(context.currentTime + 0.01);
+                unlocked = true;
+            } catch (_error) {
+                // Ignore unlock probe errors.
+            }
         }
 
-        if (context.state !== "running") {
-            context.resume().catch(() => {});
-        }
+        ["incoming", "outgoing"].forEach((direction) => {
+            const audio = getOrCreateRingtoneAudio(direction);
+            if (!audio) {
+                return;
+            }
 
-        try {
-            const oscillator = context.createOscillator();
-            const gainNode = context.createGain();
-            gainNode.gain.value = 0.00001;
-            oscillator.connect(gainNode);
-            gainNode.connect(context.destination);
-            oscillator.start();
-            oscillator.stop(context.currentTime + 0.01);
-        } catch (_error) {
-            // Ignore unlock probe errors.
-        }
+            const prevMuted = audio.muted;
+            audio.muted = true;
 
-        if (pendingRingtoneDirection && currentCall?.phase === "ringing") {
+            try {
+                const playResult = audio.play();
+                if (playResult && typeof playResult.then === "function") {
+                    playResult
+                        .then(() => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                            audio.muted = prevMuted;
+                        })
+                        .catch(() => {
+                            audio.muted = prevMuted;
+                        });
+                } else {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audio.muted = prevMuted;
+                }
+                unlocked = true;
+            } catch (_error) {
+                audio.muted = prevMuted;
+            }
+        });
+
+        if (currentCall?.phase === "ringing" && pendingRingtoneDirection) {
             const nextDirection = pendingRingtoneDirection;
             pendingRingtoneDirection = null;
             startRingtone(nextDirection);
         }
 
-        return true;
+        return unlocked;
+    }
+
+    function playAudioRingtone(direction = "incoming") {
+        const audio = getOrCreateRingtoneAudio(direction);
+        if (!audio) {
+            return false;
+        }
+
+        try {
+            audio.currentTime = 0;
+            audio.muted = false;
+            activeRingtoneAudio = audio;
+
+            const playResult = audio.play();
+            if (playResult && typeof playResult.then === "function") {
+                playResult.catch(() => {
+                    if (activeRingtoneAudio === audio) {
+                        activeRingtoneAudio = null;
+                    }
+                    pendingRingtoneDirection = direction;
+                    const pattern = ringtonePatterns[direction] || ringtonePatterns.incoming;
+                    playRingtonePattern(pattern);
+                });
+            }
+
+            return true;
+        } catch (_error) {
+            activeRingtoneAudio = null;
+            return false;
+        }
     }
 
     function bindRingtoneUnlockHandlers() {
@@ -212,6 +325,8 @@ export function initCallsModule(app) {
         }
 
         ringtoneUnlockHandlersBound = true;
+        getOrCreateRingtoneAudio("incoming");
+        getOrCreateRingtoneAudio("outgoing");
 
         const unlockHandler = () => {
             unlockRingtoneAudio();
@@ -285,11 +400,19 @@ export function initCallsModule(app) {
 
     function startRingtone(direction = "incoming") {
         stopRingtone();
+        pendingRingtoneDirection = direction;
+
+        const audioStarted = playAudioRingtone(direction);
+        if (audioStarted) {
+            pendingRingtoneDirection = null;
+            return true;
+        }
+
         const pattern = ringtonePatterns[direction] || ringtonePatterns.incoming;
         const started = playRingtonePattern(pattern);
 
-        if (!started) {
-            pendingRingtoneDirection = direction;
+        if (started) {
+            pendingRingtoneDirection = null;
         }
 
         return started;
@@ -300,6 +423,20 @@ export function initCallsModule(app) {
             window.clearTimeout(ringtoneLoopTimerId);
             ringtoneLoopTimerId = null;
         }
+
+        Object.values(ringtoneAudioByDirection).forEach((audio) => {
+            if (!audio) {
+                return;
+            }
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (_error) {
+                // ignore audio pause issues
+            }
+        });
+
+        activeRingtoneAudio = null;
         pendingRingtoneDirection = null;
     }
 

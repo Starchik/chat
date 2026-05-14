@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "messenger-static-v22";
+﻿const CACHE_NAME = "messenger-static-v23";
 const OFFLINE_URLS = [
     "/",
     "/login",
@@ -21,6 +21,8 @@ const OFFLINE_URLS = [
     "/static/js/calls.js",
     "/static/js/socket.js",
     "/static/js/sw-register.js",
+    "/static/sounds/ring-incoming.wav",
+    "/static/sounds/ring-outgoing.wav",
     "/static/manifest.json",
     "/static/icons/icon-192.svg",
     "/static/icons/icon-512.svg",
@@ -114,6 +116,7 @@ self.addEventListener("notificationclick", (event) => {
         await clients.openWindow(targetUrl);
     })());
 });
+
 
 
 

@@ -31,6 +31,17 @@ def _split_csv_env(name: str):
     return [item.strip() for item in chunks if item and item.strip()]
 
 
+def _env_float(name: str, default: float):
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    try:
+        return float(raw_value.strip())
+    except Exception:
+        return default
+
+
 def _normalize_ice_servers(raw_servers):
     normalized_servers = []
 
@@ -173,3 +184,19 @@ class Config:
 
     WEBRTC_ICE_SERVERS = _load_webrtc_ice_servers()
     WEBRTC_RING_TIMEOUT_SEC = int(os.getenv("WEBRTC_RING_TIMEOUT_SEC", "45"))
+    WEBRTC_RINGTONE_INCOMING_URL = os.getenv(
+        "WEBRTC_RINGTONE_INCOMING_URL",
+        "/static/sounds/ring-incoming.wav",
+    )
+    WEBRTC_RINGTONE_OUTGOING_URL = os.getenv(
+        "WEBRTC_RINGTONE_OUTGOING_URL",
+        "/static/sounds/ring-outgoing.wav",
+    )
+    WEBRTC_RINGTONE_INCOMING_VOLUME = max(
+        0.0,
+        min(1.0, _env_float("WEBRTC_RINGTONE_INCOMING_VOLUME", 0.88)),
+    )
+    WEBRTC_RINGTONE_OUTGOING_VOLUME = max(
+        0.0,
+        min(1.0, _env_float("WEBRTC_RINGTONE_OUTGOING_VOLUME", 0.72)),
+    )
