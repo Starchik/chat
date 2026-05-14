@@ -1,8 +1,10 @@
 ﻿import json
 import math
 import os
+import errno
 import re
 import secrets
+import shutil
 import time
 
 from flask import Blueprint, current_app, jsonify, request
@@ -219,11 +221,26 @@ def _consume_chunk_uploads(upload_ids, user_id: int, chat_id: int):
             return None, {"error": "Поврежденные метаданные загрузки"}, 400
 
         final_path = current_app.config["FILE_UPLOAD_FOLDER"] / stored_name
+        final_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            os.replace(part_path, final_path)
+            try:
+                os.replace(part_path, final_path)
+            except OSError as replace_error:
+                # Cross-device move can fail when temp chunks and final uploads
+                # are on different Docker bind mounts.
+                if replace_error.errno != errno.EXDEV:
+                    raise
+
+                with part_path.open("rb") as src_file, final_path.open("wb") as dst_file:
+                    shutil.copyfileobj(src_file, dst_file, length=1024 * 1024)
+
+                try:
+                    part_path.unlink()
+                except FileNotFoundError:
+                    pass
         except Exception:
-            return None, {"error": "Не удалось сохранить загруженный файл"}, 500
+            return None, {"error": "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u043d\u044b\u0439 \u0444\u0430\u0439\u043b"}, 500
 
         try:
             _chunk_meta_path(upload_id).unlink()
