@@ -1,7 +1,7 @@
 ﻿window.APP_CONFIG = {
     apiBase: "/api",
     socketPath: "/socket.io",
-    cacheVersion: "v6",
+    cacheVersion: "v7",
     messagePageSize: 30,
     maxCachedMessages: 500,
     maxUploadFiles: 10,
@@ -16,3 +16,4 @@
         "💚", "🧡", "💜", "🤍", "🖤", "💬", "✨", "🫶",
     ],
 };
+

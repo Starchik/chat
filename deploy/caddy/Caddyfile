@@ -1,0 +1,18 @@
+{
+	email {$ACME_EMAIL:admin@example.com}
+}
+
+{$APP_DOMAIN:localhost} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(self)"
+	}
+
+	reverse_proxy messenger:5000 {
+		flush_interval -1
+	}
+}

@@ -1,14 +1,69 @@
-﻿version: "3.9"
-
 services:
   messenger:
-    build: .
-    container_name: flask_messenger
+    build:
+      context: .
+    container_name: chat_app
+    env_file:
+      - .env
+    expose:
+      - "5000"
+    volumes:
+      - ./instance:/app/instance
+      - ./app/static/uploads:/app/app/static/uploads
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3); sys.exit(0 if r.status==200 else 1)\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - chat_net
+
+  caddy:
+    image: caddy:2.10-alpine
+    container_name: chat_caddy
+    depends_on:
+      messenger:
+        condition: service_healthy
     env_file:
       - .env
     ports:
-      - "5000:5000"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
-      - ./:/app
-      - ./instance:/app/instance
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     restart: unless-stopped
+    networks:
+      - chat_net
+
+  coturn:
+    image: coturn/coturn:4.6.3-r3
+    container_name: chat_coturn
+    env_file:
+      - .env
+    entrypoint: ["/bin/sh", "/usr/local/bin/start-turn.sh"]
+    volumes:
+      - ./deploy/coturn/start-turn.sh:/usr/local/bin/start-turn.sh:ro
+    ports:
+      - "${TURN_LISTEN_PORT:-3478}:${TURN_LISTEN_PORT:-3478}/tcp"
+      - "${TURN_LISTEN_PORT:-3478}:${TURN_LISTEN_PORT:-3478}/udp"
+      - "${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}:${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}/tcp"
+      - "${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}:${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}/udp"
+    restart: unless-stopped
+    networks:
+      - chat_net
+
+networks:
+  chat_net:
+
+volumes:
+  caddy_data:
+  caddy_config:
