@@ -383,10 +383,18 @@
 
         const flushImageBuffer = () => {
             while (imageBuffer.length > 0) {
-                blocks.push({
-                    type: "image-group",
-                    attachments: imageBuffer.slice(0, MAX_IMAGE_ATTACHMENT_GROUP_SIZE),
-                });
+                const group = imageBuffer.slice(0, MAX_IMAGE_ATTACHMENT_GROUP_SIZE);
+                if (group.length === 1) {
+                    blocks.push({
+                        type: "single",
+                        attachment: group[0],
+                    });
+                } else {
+                    blocks.push({
+                        type: "image-group",
+                        attachments: group,
+                    });
+                }
                 imageBuffer = imageBuffer.slice(MAX_IMAGE_ATTACHMENT_GROUP_SIZE);
             }
         };
@@ -1037,7 +1045,9 @@
             const blocks = splitAttachmentBlocks(message.attachments);
             blocks.forEach((block) => {
                 if (block.type === "image-group") {
-                    bubble.classList.add("message--has-gallery");
+                    if (block.attachments.length > 1) {
+                        bubble.classList.add("message--has-gallery");
+                    }
                     const gallery = document.createElement("div");
                     gallery.className = "message__gallery";
                     gallery.dataset.previewGallery = "1";

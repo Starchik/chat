@@ -226,14 +226,12 @@
 }
 
 .message--has-gallery {
-    width: min(86vw, 640px);
     max-width: min(86vw, 640px);
 }
 
 .message__gallery {
     display: grid;
     width: 100%;
-    grid-auto-flow: dense;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.45rem;
 }
@@ -244,6 +242,12 @@
     aspect-ratio: 1 / 1;
 }
 
+.message__gallery .message__file > a {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 .message__gallery .message__file-image {
     width: 100%;
     height: 100%;
@@ -252,19 +256,38 @@
 }
 
 .message__gallery[data-count="1"] {
-    grid-template-columns: 1fr;
+    display: block;
+    width: auto;
+    max-width: 100%;
+    justify-self: start;
 }
 
 .message__gallery[data-count="1"] .message__file {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: auto;
+    width: fit-content;
+    max-width: min(100%, 420px);
+}
+
+.message__gallery[data-count="1"] .message__file > a {
+    width: auto;
+    height: auto;
+}
+
+.message__gallery[data-count="1"] .message__file-image {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: min(58vh, 520px);
+    object-fit: contain;
 }
 
 .message__gallery[data-count="2"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.message__gallery[data-count="3"] .message__file:first-child {
-    grid-row: span 2;
+.message__gallery[data-count="3"],
+.message__gallery[data-count="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .message__gallery[data-count="5"],
@@ -273,11 +296,6 @@
 .message__gallery[data-count="8"],
 .message__gallery[data-count="9"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.message__gallery[data-count="5"] .message__file:first-child {
-    grid-column: span 2;
-    grid-row: span 2;
 }
 
 .message__gallery[data-count="10"] {
@@ -723,11 +741,16 @@
 
 @media (max-width: 900px) {
     .message__gallery {
-        grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .message__gallery .message__file-image {
-        height: 126px;
+    .message__gallery[data-count="5"],
+    .message__gallery[data-count="6"],
+    .message__gallery[data-count="7"],
+    .message__gallery[data-count="8"],
+    .message__gallery[data-count="9"],
+    .message__gallery[data-count="10"] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .media-preview__close {
@@ -763,8 +786,13 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .message__gallery .message__file-image {
-        height: 112px;
+    .message__gallery[data-count="5"],
+    .message__gallery[data-count="6"],
+    .message__gallery[data-count="7"],
+    .message__gallery[data-count="8"],
+    .message__gallery[data-count="9"],
+    .message__gallery[data-count="10"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .media-preview__close {
