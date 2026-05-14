@@ -168,7 +168,7 @@ class Config:
     )
     VAPID_CLAIMS_SUB = os.getenv("VAPID_CLAIMS_SUB", "mailto:admin@example.com")
 
-    SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "eventlet")
+    SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "threading")
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
     WEBRTC_ICE_SERVERS = _load_webrtc_ice_servers()
