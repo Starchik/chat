@@ -1,5 +1,7 @@
 ﻿from typing import Optional
 
+from flask import current_app
+
 from app.extensions import db
 from app.models import (
     Chat,
@@ -110,20 +112,39 @@ class MessageService:
     def delete_message(message_id: int, user_id: int):
         message = Message.query.get(message_id)
         if not message:
-            return {"error": "Сообщение не найдено"}, 404
+            return {"error": "\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e"}, 404
 
         membership = ChatMembership.query.filter_by(chat_id=message.chat_id, user_id=user_id).first()
         if not membership:
-            return {"error": "Доступ к чату запрещен"}, 403
+            return {"error": "\u0414\u043e\u0441\u0442\u0443\u043f \u043a \u0447\u0430\u0442\u0443 \u0437\u0430\u043f\u0440\u0435\u0449\u0435\u043d"}, 403
 
         if message.sender_id != user_id and not membership.is_admin:
-            return {"error": "Недостаточно прав для удаления"}, 403
+            return {"error": "\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u043f\u0440\u0430\u0432 \u0434\u043b\u044f \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u044f"}, 403
+
+        attachment_file_paths = []
+        for attachment in list(message.attachments):
+            if attachment.stored_name:
+                attachment_file_paths.append(current_app.config["FILE_UPLOAD_FOLDER"] / attachment.stored_name)
+            db.session.delete(attachment)
+
+        PinnedMessage.query.filter_by(chat_id=message.chat_id, message_id=message.id).delete()
 
         message.is_deleted = True
         message.deleted_at = utcnow()
         message.content = None
+        message.message_type = "text"
         db.session.commit()
+
+        for path in attachment_file_paths:
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                # Message must stay deleted even if physical cleanup fails.
+                pass
+
         return {"ok": True, "message_id": message_id, "chat_id": message.chat_id}, None
+
 
     @staticmethod
     def forward_message(source_message_id: int, user_id: int, target_chat_id: int):

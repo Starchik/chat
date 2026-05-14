@@ -727,7 +727,7 @@
         content.textContent = isDeleted ? "Сообщение удалено" : (message.content || "");
         bubble.appendChild(content);
 
-        if (message.attachments?.length) {
+        if (!isDeleted && message.attachments?.length) {
             const files = document.createElement("div");
             files.className = "message__files";
             files.innerHTML = message.attachments.map(renderAttachment).join("");
@@ -1321,6 +1321,8 @@
                     ...item,
                     is_deleted: true,
                     content: null,
+                    attachments: [],
+                    message_type: "text",
                 }
                 : item
         ));
