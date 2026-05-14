@@ -324,9 +324,9 @@
 
         if (mediaKind === "video") {
             return `
-                <div class="message__file">
+                <div class="message__file message__file--video">
                     <a
-                        class="message__file-doc message__file-doc--preview"
+                        class="message__file-preview message__file-preview--video"
                         href="${fileUrl}"
                         data-previewable="1"
                         data-kind="video"
@@ -334,8 +334,13 @@
                         data-name="${fileName}"
                         data-mime="${mime}"
                     >
-                        <i class="fa-solid fa-film"></i>
-                        <span>${fileName}</span>
+                        <video class="message__file-video" preload="metadata" playsinline muted>
+                            <source src="${fileUrl}" type="${mime}" />
+                        </video>
+                        <span class="message__file-video-play">
+                            <i class="fa-solid fa-play"></i>
+                        </span>
+                        <span class="message__file-video-name">${fileName}</span>
                     </a>
                 </div>
             `;
