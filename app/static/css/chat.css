@@ -219,6 +219,30 @@
     letter-spacing: 0.01em;
 }
 
+.message--call {
+    border-color: rgba(143, 204, 255, 0.36);
+}
+
+.message__content--call {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.46rem;
+    font-weight: 600;
+}
+
+.message__call-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 999px;
+    background: rgba(97, 178, 255, 0.2);
+    color: rgba(193, 230, 255, 0.95);
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
 .message__files {
     margin-top: 0.56rem;
     display: grid;

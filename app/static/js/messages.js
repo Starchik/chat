@@ -988,6 +988,7 @@
     function createMessageElement(message, previousMessage = null) {
         const isMine = message.sender_id === state.me.id;
         const isDeleted = Boolean(message.is_deleted);
+        const isCallMessage = message.message_type === "call";
 
         const row = document.createElement("div");
         row.className = `message-row ${isMine ? "message-row--mine" : "message-row--other"}`;
@@ -1001,7 +1002,7 @@
         }
 
         const bubble = document.createElement("article");
-        bubble.className = `message ${isMine ? "message--mine" : "message--other"} ${isDeleted ? "message--deleted" : ""}`;
+        bubble.className = `message ${isMine ? "message--mine" : "message--other"} ${isDeleted ? "message--deleted" : ""} ${isCallMessage ? "message--call" : ""}`;
         bubble.dataset.messageId = String(message.id);
 
         const chat = getCurrentChat();
@@ -1034,8 +1035,22 @@
         }
 
         const content = document.createElement("div");
-        content.className = "message__content";
-        content.textContent = isDeleted ? "Сообщение удалено" : (message.content || "");
+        content.className = `message__content ${isCallMessage ? "message__content--call" : ""}`;
+
+        if (isDeleted) {
+            content.textContent = "Сообщение удалено";
+        } else if (isCallMessage) {
+            const icon = document.createElement("span");
+            icon.className = "message__call-icon";
+            icon.innerHTML = "<i class=\"fa-solid fa-phone\"></i>";
+
+            const text = document.createElement("span");
+            text.textContent = message.content || "Звонок";
+
+            content.append(icon, text);
+        } else {
+            content.textContent = message.content || "";
+        }
         bubble.appendChild(content);
 
         if (!isDeleted && message.attachments?.length) {
@@ -1217,11 +1232,16 @@
     function setupContextMenuState(message) {
         const isMine = message.sender_id === state.me.id;
         const isDeleted = Boolean(message.is_deleted);
+        const isCallMessage = message.message_type === "call";
 
         refs.contextMenu.querySelectorAll("button[data-action]").forEach((button) => {
             const action = button.dataset.action;
 
             if (action === "edit" || action === "delete") {
+                if (action === "edit" && isCallMessage) {
+                    button.style.display = "none";
+                    return;
+                }
                 button.style.display = isMine && !isDeleted ? "flex" : "none";
                 return;
             }

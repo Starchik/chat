@@ -1,12 +1,15 @@
 ﻿from collections import defaultdict
 
+from datetime import datetime
+
 from flask import current_app, request
 from flask_jwt_extended import decode_token
 from flask_socketio import ConnectionRefusedError, emit, join_room, leave_room
 
 from app.extensions import db, socketio
-from app.models import ChatMembership, User
-from app.services import MessageService
+from app.models import Chat, ChatMembership, User
+from app.services import ChatService, MessageService
+from app.utils import utcnow
 
 
 sid_to_user: dict[str, int] = {}
@@ -65,6 +68,99 @@ def _emit_call_error(error_message: str):
     emit("call_error", {"error": error_message})
 
 
+def _broadcast_chat_update(chat_id: int):
+    chat = Chat.query.get(chat_id)
+    if not chat:
+        return
+
+    memberships = ChatMembership.query.filter_by(chat_id=chat_id).all()
+    for membership in memberships:
+        chat_payload = ChatService.serialize_chat_for_user(chat, membership.user_id)
+        socketio.emit(
+            "chat_updated",
+            {"chat": chat_payload},
+            room=f"user_{membership.user_id}",
+        )
+
+
+def _call_kind_label(kind: str | None) -> str:
+    return "Видеозвонок" if str(kind or "").lower() == "video" else "Аудиозвонок"
+
+
+def _format_call_duration(duration_sec: int) -> str:
+    safe = max(0, int(duration_sec))
+    hours, remainder = divmod(safe, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes}:{seconds:02d}"
+
+
+def _build_call_message_text(call: dict, reason: str | None, duration_sec: int | None) -> str:
+    kind_label = _call_kind_label(call.get("kind"))
+    kind_label_lower = kind_label.lower()
+    safe_reason = str(reason or "ended").strip().lower()
+
+    if safe_reason == "busy":
+        return f"{kind_label}: пользователь занят"
+    if safe_reason == "offline":
+        return f"{kind_label}: пользователь не в сети"
+    if safe_reason in {"timeout", "missed"}:
+        return f"Пропущенный {kind_label_lower}"
+    if safe_reason in {"rejected", "declined"}:
+        return f"{kind_label} отклонен"
+    if safe_reason in {"failed", "error"}:
+        return f"{kind_label}: ошибка соединения"
+    if safe_reason == "disconnected":
+        if duration_sec and duration_sec > 0:
+            return f"{kind_label} прерван • {_format_call_duration(duration_sec)}"
+        return f"{kind_label} прерван"
+    if safe_reason in {"cancelled", "canceled"}:
+        return f"Отмененный {kind_label_lower}"
+
+    if duration_sec and duration_sec > 0:
+        return f"{kind_label} завершен • {_format_call_duration(duration_sec)}"
+    if call.get("accepted"):
+        return f"{kind_label} завершен"
+    return f"Отмененный {kind_label_lower}"
+
+
+def _log_call_message(call: dict, reason: str, actor_id: int | None = None):
+    if not isinstance(call, dict):
+        return
+
+    chat_id = call.get("chat_id")
+    sender_id = actor_id or call.get("caller_id")
+    if not chat_id or not sender_id:
+        return
+
+    duration_sec = None
+    if call.get("accepted"):
+        accepted_at = call.get("accepted_at")
+        if isinstance(accepted_at, datetime):
+            duration_sec = max(0, int((utcnow() - accepted_at).total_seconds()))
+
+    content = _build_call_message_text(call, reason=reason, duration_sec=duration_sec)
+    message, error, _status = MessageService.create_message(
+        chat_id=int(chat_id),
+        sender_id=int(sender_id),
+        content=content,
+        message_type="call",
+    )
+    if error or not message:
+        current_app.logger.warning(
+            "Failed to persist call log for chat_id=%s session_id=%s reason=%s error=%s",
+            chat_id,
+            call.get("session_id"),
+            reason,
+            error,
+        )
+        return
+
+    socketio.emit("new_message", {"message": message.to_dict()}, room=f"chat_{chat_id}")
+    _broadcast_chat_update(int(chat_id))
+
+
 def _schedule_call_timeout(session_id: str, timeout_sec: int):
     def _worker():
         safe_timeout = timeout_sec if timeout_sec and timeout_sec > 0 else 45
@@ -74,6 +170,7 @@ def _schedule_call_timeout(session_id: str, timeout_sec: int):
         if not call or call.get("accepted"):
             return
 
+        _log_call_message(call, reason="timeout", actor_id=call.get("caller_id"))
         _clear_call_session(session_id)
         payload = {
             "session_id": session_id,
@@ -167,6 +264,7 @@ def socket_disconnect():
     if active_session_id:
         call = _clear_call_session(active_session_id)
         if call:
+            _log_call_message(call, reason="disconnected", actor_id=user_id)
             peer_id = _get_other_participant(call, user_id)
             if peer_id:
                 socketio.emit(
@@ -350,6 +448,18 @@ def socket_call_invite(data=None):
         return
 
     if user_active_call.get(target_user_id):
+        _log_call_message(
+            {
+                "session_id": session_id,
+                "chat_id": chat_id,
+                "kind": kind,
+                "caller_id": caller_id,
+                "callee_id": target_user_id,
+                "accepted": False,
+            },
+            reason="busy",
+            actor_id=caller_id,
+        )
         emit(
             "call_reject",
             {
@@ -362,6 +472,18 @@ def socket_call_invite(data=None):
         return
 
     if not user_to_sids.get(target_user_id):
+        _log_call_message(
+            {
+                "session_id": session_id,
+                "chat_id": chat_id,
+                "kind": kind,
+                "caller_id": caller_id,
+                "callee_id": target_user_id,
+                "accepted": False,
+            },
+            reason="offline",
+            actor_id=caller_id,
+        )
         emit(
             "call_reject",
             {
@@ -383,6 +505,8 @@ def socket_call_invite(data=None):
         "caller_id": caller_id,
         "callee_id": target_user_id,
         "accepted": False,
+        "created_at": utcnow(),
+        "accepted_at": None,
     }
     user_active_call[caller_id] = session_id
     user_active_call[target_user_id] = session_id
@@ -445,6 +569,7 @@ def socket_call_accept(data=None):
         return
 
     call["accepted"] = True
+    call["accepted_at"] = utcnow()
 
     socketio.emit(
         "call_accept",
@@ -483,6 +608,7 @@ def socket_call_reject(data=None):
         _emit_call_error("Доступ к звонку запрещен")
         return
 
+    _log_call_message(call, reason=reason, actor_id=user_id)
     peer_id = _get_other_participant(call, user_id)
     _clear_call_session(session_id)
 
@@ -524,6 +650,7 @@ def socket_call_end(data=None):
         _emit_call_error("Доступ к звонку запрещен")
         return
 
+    _log_call_message(call, reason=reason, actor_id=user_id)
     peer_id = _get_other_participant(call, user_id)
     _clear_call_session(session_id)
 

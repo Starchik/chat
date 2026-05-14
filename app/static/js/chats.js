@@ -39,6 +39,10 @@
             return "Сообщение удалено";
         }
 
+        if (lastMessage.message_type === "call") {
+            return lastMessage.content || "Звонок";
+        }
+
         if (lastMessage.content) {
             return lastMessage.content;
         }
