@@ -1037,9 +1037,11 @@
             const blocks = splitAttachmentBlocks(message.attachments);
             blocks.forEach((block) => {
                 if (block.type === "image-group") {
+                    bubble.classList.add("message--has-gallery");
                     const gallery = document.createElement("div");
                     gallery.className = "message__gallery";
                     gallery.dataset.previewGallery = "1";
+                    gallery.dataset.count = String(block.attachments.length || 0);
                     gallery.innerHTML = block.attachments.map(renderAttachment).join("");
                     files.appendChild(gallery);
                     return;

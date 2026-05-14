@@ -219,6 +219,11 @@
         max-width: 94%;
     }
 
+    .message--has-gallery {
+        width: 100%;
+        max-width: 100%;
+    }
+
     .fab-new-chat {
         right: 0.72rem;
         bottom: 0.72rem;

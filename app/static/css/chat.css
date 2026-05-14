@@ -225,21 +225,63 @@
     gap: 0.45rem;
 }
 
+.message--has-gallery {
+    width: min(86vw, 640px);
+    max-width: min(86vw, 640px);
+}
+
 .message__gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    width: 100%;
+    grid-auto-flow: dense;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.45rem;
 }
 
 .message__gallery .message__file {
     margin: 0;
+    min-width: 0;
+    aspect-ratio: 1 / 1;
 }
 
 .message__gallery .message__file-image {
     width: 100%;
-    height: 142px;
+    height: 100%;
     max-height: none;
     object-fit: cover;
+}
+
+.message__gallery[data-count="1"] {
+    grid-template-columns: 1fr;
+}
+
+.message__gallery[data-count="1"] .message__file {
+    aspect-ratio: 4 / 3;
+}
+
+.message__gallery[data-count="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.message__gallery[data-count="3"] .message__file:first-child {
+    grid-row: span 2;
+}
+
+.message__gallery[data-count="5"],
+.message__gallery[data-count="6"],
+.message__gallery[data-count="7"],
+.message__gallery[data-count="8"],
+.message__gallery[data-count="9"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.message__gallery[data-count="5"] .message__file:first-child {
+    grid-column: span 2;
+    grid-row: span 2;
+}
+
+.message__gallery[data-count="10"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .message__file {
