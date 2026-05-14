@@ -1,8 +1,9 @@
-﻿from sqlalchemy import func
+﻿from flask import current_app
+from sqlalchemy import func
 
 from app.extensions import db
-from app.models import Chat, ChatMembership, Message, PinnedMessage, User
-from app.utils import isoformat_or_none, utcnow
+from app.models import Chat, ChatMembership, Message, MessageAttachment, PinnedMessage, User
+from app.utils import isoformat_or_none, preview_storage_name, utcnow
 
 
 class ChatService:
@@ -208,3 +209,115 @@ class ChatService:
         db.session.commit()
         return {"ok": True, "is_archived": membership.is_archived}, None
 
+    @staticmethod
+    def clear_chat_history(chat_id: int, user_id: int):
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return None, {"error": "Чат не найден"}, 404
+
+        membership = ChatMembership.query.filter_by(chat_id=chat_id, user_id=user_id).first()
+        if not membership:
+            return None, {"error": "Доступ к чату запрещен"}, 403
+
+        if chat.is_group and not membership.is_admin:
+            return None, {"error": "Только администратор может очищать историю группы"}, 403
+
+        upload_folder = current_app.config["FILE_UPLOAD_FOLDER"]
+        attachment_file_paths = []
+
+        attachments = (
+            MessageAttachment.query
+            .join(Message, Message.id == MessageAttachment.message_id)
+            .filter(Message.chat_id == chat_id)
+            .all()
+        )
+
+        for attachment in attachments:
+            stored_name = (attachment.stored_name or "").strip()
+            if not stored_name:
+                continue
+            attachment_file_paths.append(upload_folder / stored_name)
+            preview_name = preview_storage_name(stored_name)
+            if preview_name:
+                attachment_file_paths.append(upload_folder / preview_name)
+
+        deleted_messages = Message.query.filter_by(chat_id=chat_id).delete(synchronize_session=False)
+        PinnedMessage.query.filter_by(chat_id=chat_id).delete(synchronize_session=False)
+
+        ChatMembership.query.filter_by(chat_id=chat_id).update(
+            {
+                ChatMembership.last_read_message_id: None,
+                ChatMembership.last_read_at: None,
+            },
+            synchronize_session=False,
+        )
+
+        chat.last_message_at = utcnow()
+        db.session.commit()
+
+        for path in attachment_file_paths:
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                pass
+
+        return {
+            "ok": True,
+            "chat_id": chat_id,
+            "deleted_messages": int(deleted_messages or 0),
+        }, None, None
+
+    @staticmethod
+    def delete_chat(chat_id: int, user_id: int):
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return None, {"error": "Чат не найден"}, 404
+
+        membership = ChatMembership.query.filter_by(chat_id=chat_id, user_id=user_id).first()
+        if not membership:
+            return None, {"error": "Доступ к чату запрещен"}, 403
+
+        if chat.is_group and not membership.is_admin:
+            return None, {"error": "Только администратор может удалить группу"}, 403
+
+        member_ids = [
+            row.user_id
+            for row in ChatMembership.query.filter_by(chat_id=chat_id).all()
+            if row.user_id is not None
+        ]
+
+        upload_folder = current_app.config["FILE_UPLOAD_FOLDER"]
+        attachment_file_paths = []
+
+        attachments = (
+            MessageAttachment.query
+            .join(Message, Message.id == MessageAttachment.message_id)
+            .filter(Message.chat_id == chat_id)
+            .all()
+        )
+
+        for attachment in attachments:
+            stored_name = (attachment.stored_name or "").strip()
+            if not stored_name:
+                continue
+            attachment_file_paths.append(upload_folder / stored_name)
+            preview_name = preview_storage_name(stored_name)
+            if preview_name:
+                attachment_file_paths.append(upload_folder / preview_name)
+
+        db.session.delete(chat)
+        db.session.commit()
+
+        for path in attachment_file_paths:
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                pass
+
+        return {
+            "ok": True,
+            "chat_id": chat_id,
+            "member_ids": list({int(member_id) for member_id in member_ids}),
+        }, None, None

@@ -1293,6 +1293,43 @@
         }
     }
 
+    async function scrollToChatStart() {
+        const chatId = state.currentChatId;
+        if (!chatId) {
+            return;
+        }
+
+        const lazyState = ensureLazyState(chatId);
+        let attempts = 0;
+        let previousOldestId = null;
+
+        while (lazyState.hasMore && attempts < 80) {
+            const messages = getChatMessages(chatId);
+            if (!messages.length) {
+                break;
+            }
+
+            const oldestMessage = messages[0];
+            const oldestId = Number(oldestMessage?.id);
+            if (!oldestId || oldestId === previousOldestId) {
+                break;
+            }
+
+            previousOldestId = oldestId;
+            await loadMessages(chatId, {
+                before: oldestId,
+                appendToTop: true,
+            });
+            attempts += 1;
+        }
+
+        refs.messagesScroll.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+        updateAutoScrollState();
+    }
+
     function ensureNotificationPermissionOnInteraction() {
         if (notificationInit || !("Notification" in window)) {
             return;
@@ -2254,5 +2291,6 @@
         onTypingPayload,
         openSearchModal,
         renderTypingIndicator,
+        scrollToChatStart,
     };
 }

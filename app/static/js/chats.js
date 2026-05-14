@@ -240,6 +240,23 @@
         renderChatList();
     }
 
+    function resetChatPanel() {
+        refs.messagesList.innerHTML = "";
+        helpers.setMessagesEmptyState(true);
+        helpers.setChatHeader(null);
+    }
+
+    async function openFallbackChatAfterRemoval(removedChatId = null) {
+        const fallback = state.chats.find((chat) => chat.id !== Number(removedChatId)) || state.chats[0] || null;
+        if (fallback) {
+            await openChat(fallback.id);
+            return;
+        }
+
+        state.currentChatId = null;
+        resetChatPanel();
+    }
+
     async function loadChats() {
         try {
             const response = await api.listChats(state.showArchived);
@@ -500,16 +517,7 @@
 
             if (movedOutOfCurrentList) {
                 removeChat(currentChat.id);
-                state.currentChatId = null;
-
-                const fallback = state.chats[0] || null;
-                if (fallback) {
-                    await openChat(fallback.id);
-                } else {
-                    helpers.setChatHeader(null);
-                    helpers.setMessagesEmptyState(true);
-                    refs.messagesList.innerHTML = "";
-                }
+                await openFallbackChatAfterRemoval(currentChat.id);
             } else {
                 upsertChat(currentChat);
             }
@@ -517,6 +525,76 @@
             helpers.showToast(nextArchiveState ? "Чат перенесен в архив" : "Чат восстановлен");
         } catch (error) {
             helpers.showToast(error.message || "Не удалось изменить статус архива");
+        }
+    }
+
+    async function clearHistoryForCurrentChat() {
+        const currentChat = getChatById(state.currentChatId);
+        if (!currentChat) {
+            return;
+        }
+
+        const chatTitle = currentChat.title || "этот чат";
+        const confirmed = window.confirm(`Очистить историю чата "${chatTitle}"? Это действие нельзя отменить.`);
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await api.clearChatHistory(currentChat.id);
+            const updatedChat = response.chat || null;
+
+            storage.clearChatCache(currentChat.id);
+
+            if (updatedChat?.id) {
+                upsertChat(updatedChat);
+            } else {
+                currentChat.last_message = null;
+                currentChat.unread_count = 0;
+                upsertChat(currentChat);
+            }
+
+            if (state.currentChatId === currentChat.id && deps.messages) {
+                const chatForRender = getChatById(currentChat.id) || updatedChat || currentChat;
+                await deps.messages.openChat(currentChat.id, chatForRender);
+            }
+
+            helpers.showToast("История очищена");
+        } catch (error) {
+            helpers.showToast(error.message || "Не удалось очистить историю");
+        }
+    }
+
+    async function deleteCurrentChat() {
+        const currentChat = getChatById(state.currentChatId);
+        if (!currentChat) {
+            return;
+        }
+
+        const chatTitle = currentChat.title || "этот чат";
+        const confirmed = window.confirm(`Удалить чат "${chatTitle}"? Это действие нельзя отменить.`);
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const chatId = currentChat.id;
+            await api.deleteChat(chatId);
+
+            storage.clearChatCache(chatId);
+            removeChat(chatId);
+
+            if (app.modules.socket) {
+                app.modules.socket.leaveChat(chatId);
+            }
+
+            if (state.currentChatId === chatId) {
+                await openFallbackChatAfterRemoval(chatId);
+            }
+
+            helpers.showToast("Чат удален");
+        } catch (error) {
+            helpers.showToast(error.message || "Не удалось удалить чат");
         }
     }
 
@@ -648,6 +726,56 @@
         upsertChat(chat);
     }
 
+    function onChatHistoryCleared(payload) {
+        const chatId = Number(payload?.chat_id);
+        if (!Number.isInteger(chatId) || chatId <= 0) {
+            return;
+        }
+
+        storage.clearChatCache(chatId);
+
+        const chat = getChatById(chatId);
+        if (chat) {
+            chat.last_message = null;
+            chat.unread_count = 0;
+            upsertChat(chat);
+        }
+
+        if (state.currentChatId === chatId && deps.messages) {
+            const currentChat = getChatById(chatId) || chat;
+            if (currentChat) {
+                void deps.messages.openChat(chatId, currentChat);
+            } else {
+                resetChatPanel();
+            }
+        }
+    }
+
+    function onChatDeleted(payload) {
+        const chatId = Number(payload?.chat_id);
+        if (!Number.isInteger(chatId) || chatId <= 0) {
+            return;
+        }
+
+        const exists = Boolean(getChatById(chatId));
+        const wasCurrent = state.currentChatId === chatId;
+
+        storage.clearChatCache(chatId);
+        removeChat(chatId);
+
+        if (app.modules.socket) {
+            app.modules.socket.leaveChat(chatId);
+        }
+
+        if (wasCurrent) {
+            void openFallbackChatAfterRemoval(chatId);
+        }
+
+        if (exists) {
+            helpers.showToast("Чат удален");
+        }
+    }
+
     function clearChatListCursorGlow() {
         if (!glowChatItemElement) {
             return;
@@ -742,5 +870,9 @@
         updateUserPresence,
         markCurrentChatRead,
         toggleArchiveForCurrentChat,
+        clearHistoryForCurrentChat,
+        deleteCurrentChat,
+        onChatHistoryCleared,
+        onChatDeleted,
     };
 }

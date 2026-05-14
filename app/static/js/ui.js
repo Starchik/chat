@@ -62,8 +62,11 @@ const refs = {
 
     contextMenu: document.getElementById("context-menu"),
     chatActionsMenu: document.getElementById("chat-actions-menu"),
+    chatToTopAction: document.getElementById("chat-to-top-action"),
     chatSearchAction: document.getElementById("chat-search-action"),
     chatArchiveAction: document.getElementById("chat-archive-action"),
+    chatClearHistoryAction: document.getElementById("chat-clear-history-action"),
+    chatDeleteAction: document.getElementById("chat-delete-action"),
     modalOverlay: document.getElementById("modal-overlay"),
     modal: document.getElementById("modal"),
     toastStack: document.getElementById("toast-stack"),
@@ -227,6 +230,25 @@ function updateChatSearchAction(chat = null) {
     refs.chatSearchAction.disabled = !currentChat;
 }
 
+function updateChatTopAction(chat = null) {
+    if (!refs.chatToTopAction) {
+        return;
+    }
+
+    const currentChat = chat || state.chats.find((item) => item.id === state.currentChatId) || null;
+    refs.chatToTopAction.disabled = !currentChat;
+}
+
+function updateChatDangerActions(chat = null) {
+    const currentChat = chat || state.chats.find((item) => item.id === state.currentChatId) || null;
+    if (refs.chatClearHistoryAction) {
+        refs.chatClearHistoryAction.disabled = !currentChat;
+    }
+    if (refs.chatDeleteAction) {
+        refs.chatDeleteAction.disabled = !currentChat;
+    }
+}
+
 function openChatActionsMenu() {
     if (!refs.menuActionBtn || refs.menuActionBtn.disabled || !refs.chatActionsMenu) {
         return;
@@ -235,6 +257,8 @@ function openChatActionsMenu() {
     const currentChat = state.chats.find((item) => item.id === state.currentChatId) || null;
     updateChatArchiveAction(currentChat);
     updateChatSearchAction(currentChat);
+    updateChatTopAction(currentChat);
+    updateChatDangerActions(currentChat);
 
     const rect = refs.menuActionBtn.getBoundingClientRect();
     openFloatingMenu(refs.chatActionsMenu, rect.right, rect.bottom + 6);
@@ -365,6 +389,8 @@ function setChatHeader(chat) {
         }
         updateChatArchiveAction(null);
         updateChatSearchAction(null);
+        updateChatTopAction(null);
+        updateChatDangerActions(null);
         closeChatActionsMenu();
         clearPinnedBanner();
         return;
@@ -381,6 +407,8 @@ function setChatHeader(chat) {
     }
     updateChatArchiveAction(chat);
     updateChatSearchAction(chat);
+    updateChatTopAction(chat);
+    updateChatDangerActions(chat);
     refs.chatAvatar.src = chat.avatar_url || avatarFallback(chat.title, true);
     refs.chatTitle.textContent = chat.title || "Без названия";
 
@@ -491,6 +519,27 @@ function bindBaseEvents(app) {
             console.error("Failed to open message search modal", error);
             showToast("Не удалось открыть поиск сообщений");
         }
+    });
+    refs.chatToTopAction?.addEventListener("click", async () => {
+        closeChatActionsMenu();
+        if (!app.modules?.messages?.scrollToChatStart) {
+            return;
+        }
+        await app.modules.messages.scrollToChatStart();
+    });
+    refs.chatClearHistoryAction?.addEventListener("click", async () => {
+        closeChatActionsMenu();
+        if (!app.modules?.chats?.clearHistoryForCurrentChat) {
+            return;
+        }
+        await app.modules.chats.clearHistoryForCurrentChat();
+    });
+    refs.chatDeleteAction?.addEventListener("click", async () => {
+        closeChatActionsMenu();
+        if (!app.modules?.chats?.deleteCurrentChat) {
+            return;
+        }
+        await app.modules.chats.deleteCurrentChat();
     });
 
     refs.modalOverlay.addEventListener("click", (event) => {

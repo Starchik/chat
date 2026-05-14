@@ -195,6 +195,14 @@
             });
         },
 
+        clearChatHistory(chatId) {
+            return apiRequest(`/chats/${chatId}/history`, { method: "DELETE" });
+        },
+
+        deleteChat(chatId) {
+            return apiRequest(`/chats/${chatId}`, { method: "DELETE" });
+        },
+
         async sendMessage({
             chatId,
             content,

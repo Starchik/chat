@@ -116,6 +116,14 @@
             }
         });
 
+        socket.on("chat_history_cleared", (payload) => {
+            deps.chats?.onChatHistoryCleared(payload || {});
+        });
+
+        socket.on("chat_deleted", (payload) => {
+            deps.chats?.onChatDeleted(payload || {});
+        });
+
         socket.on("user_status", (payload) => {
             if (!payload?.user_id) {
                 return;

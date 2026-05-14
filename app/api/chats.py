@@ -2,6 +2,7 @@
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import or_
 
+from app.extensions import socketio
 from app.models import Chat, ChatMembership, Message, MessageAttachment, User
 from app.services import ChatService, MessageService
 
@@ -33,6 +34,30 @@ def serialize_message(message: Message):
         payload["forwarded_from"] = None
 
     return payload
+
+
+def _broadcast_chat_update(chat_id: int):
+    chat = Chat.query.get(chat_id)
+    if not chat:
+        return
+
+    memberships = ChatMembership.query.filter_by(chat_id=chat_id).all()
+    for membership in memberships:
+        chat_payload = ChatService.serialize_chat_for_user(chat, membership.user_id)
+        socketio.emit(
+            "chat_updated",
+            {"chat": chat_payload},
+            room=f"user_{membership.user_id}",
+        )
+
+
+def _broadcast_chat_deleted(chat_id: int, member_ids: list[int]):
+    for member_id in {int(item) for item in (member_ids or []) if item is not None}:
+        socketio.emit(
+            "chat_deleted",
+            {"chat_id": chat_id},
+            room=f"user_{member_id}",
+        )
 
 
 @chats_bp.get("")
@@ -167,8 +192,6 @@ def search_messages(chat_id: int):
             .all()
         )
     except Exception:
-        # Fallback: keep search functional even if attachment-query branch fails
-        # for a specific DB/runtime edge case.
         matched_messages = (
             Message.query
             .filter(
@@ -219,6 +242,48 @@ def archive_chat(chat_id: int):
     if error:
         return jsonify(payload), error
     return jsonify(payload)
+
+
+@chats_bp.delete("/<int:chat_id>/history")
+@jwt_required()
+def clear_chat_history(chat_id: int):
+    user_id = int(get_jwt_identity())
+    payload, error, status = ChatService.clear_chat_history(chat_id, user_id)
+    if error:
+        return jsonify(error), status
+
+    chat = Chat.query.get(chat_id)
+    chat_payload = ChatService.serialize_chat_for_user(chat, user_id) if chat else None
+
+    socketio.emit("chat_history_cleared", {"chat_id": chat_id}, room=f"chat_{chat_id}")
+    if chat:
+        _broadcast_chat_update(chat_id)
+
+    return jsonify(
+        {
+            **(payload or {}),
+            "chat": chat_payload,
+        }
+    )
+
+
+@chats_bp.delete("/<int:chat_id>")
+@jwt_required()
+def delete_chat(chat_id: int):
+    user_id = int(get_jwt_identity())
+    payload, error, status = ChatService.delete_chat(chat_id, user_id)
+    if error:
+        return jsonify(error), status
+
+    member_ids = (payload or {}).get("member_ids") or []
+    _broadcast_chat_deleted(chat_id, member_ids)
+
+    return jsonify(
+        {
+            "ok": True,
+            "chat_id": chat_id,
+        }
+    )
 
 
 @chats_bp.get("/<int:chat_id>/members")
