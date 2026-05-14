@@ -48,7 +48,7 @@
         });
     }
 
-    async function uploadFileInChunks({ chatId, file }) {
+    async function uploadFileInChunks({ chatId, file, fileIndex = 0, fileCount = 1, onProgress = null }) {
         const initPayload = await initChunkUpload({ chatId, file });
         const uploadId = String(initPayload.upload_id || "").trim();
         const chunkSize = Math.max(
@@ -62,6 +62,17 @@
 
         if (!uploadId) {
             throw new Error("Сервер не вернул upload_id");
+        }
+
+        if (typeof onProgress === "function") {
+            onProgress({
+                file,
+                fileIndex,
+                fileCount,
+                uploadedBytes: 0,
+                totalBytes: file.size,
+                percent: 0,
+            });
         }
 
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
@@ -78,6 +89,23 @@
                 method: "POST",
                 body: formData,
             });
+
+            if (typeof onProgress === "function") {
+                const uploadedBytes = end;
+                const totalBytes = file.size;
+                const percent = totalBytes > 0
+                    ? Math.min(100, (uploadedBytes / totalBytes) * 100)
+                    : 100;
+
+                onProgress({
+                    file,
+                    fileIndex,
+                    fileCount,
+                    uploadedBytes,
+                    totalBytes,
+                    percent,
+                });
+            }
         }
 
         return uploadId;
@@ -160,12 +188,26 @@
             });
         },
 
-        async sendMessage({ chatId, content, replyToId = null, forwardFromId = null, files = [] }) {
+        async sendMessage({
+            chatId,
+            content,
+            replyToId = null,
+            forwardFromId = null,
+            files = [],
+            onUploadProgress = null,
+        }) {
             if (files.length > 0) {
                 const uploadIds = [];
 
-                for (const file of files) {
-                    const uploadId = await uploadFileInChunks({ chatId, file });
+                for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
+                    const file = files[fileIndex];
+                    const uploadId = await uploadFileInChunks({
+                        chatId,
+                        file,
+                        fileIndex,
+                        fileCount: files.length,
+                        onProgress: onUploadProgress,
+                    });
                     uploadIds.push(uploadId);
                 }
 

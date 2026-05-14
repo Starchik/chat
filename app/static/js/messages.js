@@ -1071,12 +1071,18 @@
 
         const content = refs.messageInput.value.trim();
         const files = deps.uploads ? deps.uploads.getFiles() : [];
+        const shouldUploadFiles = !state.editingMessageId && files.length > 0;
 
         if (!content && files.length === 0) {
             return;
         }
 
         refs.sendBtn.disabled = true;
+        let currentUploadingFile = null;
+        if (deps.uploads && shouldUploadFiles) {
+            deps.uploads.beginUpload(files);
+            deps.uploads.setUploadLocked(true);
+        }
 
         try {
             if (state.editingMessageId) {
@@ -1091,7 +1097,14 @@
                     content,
                     replyToId: state.replyToMessage?.id || null,
                     files,
+                    onUploadProgress: (progress) => {
+                        currentUploadingFile = progress.file || currentUploadingFile;
+                        deps.uploads?.updateUploadProgress(progress);
+                    },
                 });
+                if (deps.uploads && shouldUploadFiles) {
+                    files.forEach((file) => deps.uploads.finishUpload(file));
+                }
                 if (!app.modules.socket?.isConnected()) {
                     onIncomingMessage(sendResponse.message);
                 }
@@ -1109,8 +1122,18 @@
                 app.modules.socket.sendTyping(state.currentChatId, false);
             }
         } catch (error) {
+            if (deps.uploads && shouldUploadFiles) {
+                if (currentUploadingFile) {
+                    deps.uploads.failUpload(currentUploadingFile, error.message || "Ошибка загрузки");
+                } else {
+                    files.forEach((file) => deps.uploads.failUpload(file, error.message || "Ошибка загрузки"));
+                }
+            }
             helpers.showToast(error.message || "Не удалось отправить сообщение");
         } finally {
+            if (shouldUploadFiles) {
+                deps.uploads?.setUploadLocked(false);
+            }
             refs.sendBtn.disabled = false;
         }
     }

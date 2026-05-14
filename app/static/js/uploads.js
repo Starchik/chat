@@ -6,6 +6,8 @@
     };
 
     let dragCounter = 0;
+    let uploadLocked = false;
+    const uploadProgressByKey = new Map();
 
     function setDropZoneVisible(visible) {
         refs.dropZone.classList.toggle("hidden", !visible);
@@ -19,17 +21,21 @@
         return Array.from(input).filter((file) => file instanceof File);
     }
 
+    function fileKey(file) {
+        return `${file.name}:${file.size}:${file.lastModified}`;
+    }
+
     function normalizeFiles(nextFiles) {
         const maxFiles = config.maxUploadFiles || 10;
         const current = state.selectedFiles || [];
         const map = new Map();
 
         current.forEach((file) => {
-            map.set(`${file.name}:${file.size}:${file.lastModified}`, file);
+            map.set(fileKey(file), file);
         });
 
         nextFiles.forEach((file) => {
-            map.set(`${file.name}:${file.size}:${file.lastModified}`, file);
+            map.set(fileKey(file), file);
         });
 
         const files = Array.from(map.values());
@@ -58,6 +64,30 @@
         return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
     }
 
+    function getUploadStatus(file) {
+        return uploadProgressByKey.get(fileKey(file)) || null;
+    }
+
+    function setUploadStatus(file, nextStatus) {
+        const key = fileKey(file);
+        const previous = uploadProgressByKey.get(key) || {};
+
+        uploadProgressByKey.set(key, {
+            ...previous,
+            ...nextStatus,
+        });
+    }
+
+    function removeStaleUploadStatus() {
+        const validKeys = new Set((state.selectedFiles || []).map((file) => fileKey(file)));
+
+        Array.from(uploadProgressByKey.keys()).forEach((key) => {
+            if (!validKeys.has(key)) {
+                uploadProgressByKey.delete(key);
+            }
+        });
+    }
+
     function renderPreview() {
         refs.uploadPreview.innerHTML = "";
 
@@ -66,27 +96,67 @@
             return;
         }
 
+        removeStaleUploadStatus();
         refs.uploadPreview.classList.remove("hidden");
 
         state.selectedFiles.forEach((file, index) => {
+            const status = getUploadStatus(file);
+            const percent = Math.max(0, Math.min(100, Math.round(Number(status?.percent) || 0)));
+            const uploadedBytes = Math.max(0, Number(status?.uploadedBytes) || 0);
+            const totalBytes = Math.max(0, Number(status?.totalBytes) || file.size || 0);
+            const isUploading = Boolean(status?.isUploading);
+            const isDone = Boolean(status?.done);
+            const hasError = Boolean(status?.error);
+
             const chip = document.createElement("div");
             chip.className = "upload-chip";
+            if (isUploading) {
+                chip.classList.add("upload-chip--uploading");
+            }
+            if (isDone) {
+                chip.classList.add("upload-chip--done");
+            }
+            if (hasError) {
+                chip.classList.add("upload-chip--error");
+            }
 
             const isImage = file.type.startsWith("image/");
             const iconClass = isImage ? "fa-regular fa-image" : "fa-regular fa-file";
+            const showProgress = isUploading || isDone || hasError || percent > 0;
+
+            let statusText = "";
+            if (hasError) {
+                statusText = helpers.escapeHtml(String(status.error));
+            } else if (isDone) {
+                statusText = "Загружено";
+            } else if (isUploading) {
+                statusText = `${percent}% • ${formatFileSize(uploadedBytes)} / ${formatFileSize(totalBytes)}`;
+            }
 
             chip.innerHTML = `
                 <i class="${iconClass}"></i>
                 <div class="upload-chip__meta">
                     <div class="upload-chip__name">${helpers.escapeHtml(file.name)}</div>
                     <div class="upload-chip__size">${formatFileSize(file.size)}</div>
+                    ${showProgress ? `
+                        <div class="upload-chip__progress-wrap">
+                            <div class="upload-chip__progress-text">${statusText}</div>
+                            <div class="upload-chip__progress-track">
+                                <div class="upload-chip__progress-bar" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+                    ` : ""}
                 </div>
-                <button class="upload-chip__remove" type="button" aria-label="Удалить файл">
+                <button class="upload-chip__remove" type="button" aria-label="Удалить файл" ${uploadLocked || isUploading ? "disabled" : ""}>
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             `;
 
             chip.querySelector(".upload-chip__remove").addEventListener("click", () => {
+                if (uploadLocked || isUploading) {
+                    return;
+                }
+
                 state.selectedFiles.splice(index, 1);
                 renderPreview();
             });
@@ -107,12 +177,81 @@
 
     function clearFiles() {
         state.selectedFiles = [];
+        uploadProgressByKey.clear();
         refs.fileInput.value = "";
         renderPreview();
     }
 
     function getFiles() {
         return [...state.selectedFiles];
+    }
+
+    function setUploadLocked(nextLocked) {
+        uploadLocked = Boolean(nextLocked);
+        renderPreview();
+    }
+
+    function beginUpload(files) {
+        (files || []).forEach((file) => {
+            setUploadStatus(file, {
+                isUploading: true,
+                done: false,
+                error: "",
+                percent: 0,
+                uploadedBytes: 0,
+                totalBytes: file.size || 0,
+            });
+        });
+
+        renderPreview();
+    }
+
+    function updateUploadProgress({ file, uploadedBytes, totalBytes, percent }) {
+        if (!file) {
+            return;
+        }
+
+        setUploadStatus(file, {
+            isUploading: true,
+            done: false,
+            error: "",
+            uploadedBytes: Math.max(0, Number(uploadedBytes) || 0),
+            totalBytes: Math.max(0, Number(totalBytes) || file.size || 0),
+            percent: Math.max(0, Math.min(100, Number(percent) || 0)),
+        });
+
+        renderPreview();
+    }
+
+    function finishUpload(file) {
+        if (!file) {
+            return;
+        }
+
+        setUploadStatus(file, {
+            isUploading: false,
+            done: true,
+            error: "",
+            uploadedBytes: file.size || 0,
+            totalBytes: file.size || 0,
+            percent: 100,
+        });
+
+        renderPreview();
+    }
+
+    function failUpload(file, errorMessage) {
+        if (!file) {
+            return;
+        }
+
+        setUploadStatus(file, {
+            isUploading: false,
+            done: false,
+            error: errorMessage || "Ошибка загрузки",
+        });
+
+        renderPreview();
     }
 
     function bindPaste() {
@@ -199,5 +338,10 @@
         clearFiles,
         getFiles,
         renderPreview,
+        setUploadLocked,
+        beginUpload,
+        updateUploadProgress,
+        finishUpload,
+        failUpload,
     };
 }
