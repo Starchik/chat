@@ -390,6 +390,19 @@
                 }
             };
 
+            const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+            const getLocalFocusPoint = (focusClientX, focusClientY) => {
+                const rect = zoomBody.getBoundingClientRect();
+                const hasFocus = Number.isFinite(focusClientX) && Number.isFinite(focusClientY);
+                const localX = hasFocus ? focusClientX - rect.left : rect.width / 2;
+                const localY = hasFocus ? focusClientY - rect.top : rect.height / 2;
+                return {
+                    x: clamp(localX, 0, rect.width),
+                    y: clamp(localY, 0, rect.height),
+                };
+            };
+
             const applyZoom = () => {
                 if (scale <= minScale + 0.001) {
                     zoomTarget.style.width = "";
@@ -412,22 +425,39 @@
                 updatePanState();
             };
 
-            const changeScale = (nextScale) => {
-                scale = Math.min(maxScale, Math.max(minScale, nextScale));
+            const changeScale = (nextScale, focusClientX = null, focusClientY = null) => {
+                const previousScale = scale;
+                const targetScale = Math.min(maxScale, Math.max(minScale, nextScale));
+
+                if (Math.abs(targetScale - previousScale) < 0.0001) {
+                    return;
+                }
+
+                const focusPoint = getLocalFocusPoint(focusClientX, focusClientY);
+                const contentFocusX = zoomBody.scrollLeft + focusPoint.x;
+                const contentFocusY = zoomBody.scrollTop + focusPoint.y;
+
+                scale = targetScale;
                 applyZoom();
+
+                const scaleRatio = scale / previousScale;
+                window.requestAnimationFrame(() => {
+                    zoomBody.scrollLeft = contentFocusX * scaleRatio - focusPoint.x;
+                    zoomBody.scrollTop = contentFocusY * scaleRatio - focusPoint.y;
+                });
             };
 
             zoomBody.addEventListener("wheel", (event) => {
                 event.preventDefault();
                 const direction = event.deltaY > 0 ? -zoomStep : zoomStep;
-                changeScale(scale + direction);
+                changeScale(scale + direction, event.clientX, event.clientY);
             }, { passive: false });
 
-            zoomTarget.addEventListener("dblclick", () => {
+            zoomTarget.addEventListener("dblclick", (event) => {
                 if (scale <= 1.001) {
-                    changeScale(2);
+                    changeScale(2, event.clientX, event.clientY);
                 } else {
-                    changeScale(1);
+                    changeScale(1, event.clientX, event.clientY);
                 }
             });
 
@@ -470,7 +500,9 @@
                         return;
                     }
                     const factor = distance / pinchStartDistance;
-                    changeScale(pinchStartScale * factor);
+                    const centerX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+                    const centerY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+                    changeScale(pinchStartScale * factor, centerX, centerY);
                     event.preventDefault();
                 }, { passive: false });
 
