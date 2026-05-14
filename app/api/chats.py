@@ -1,7 +1,8 @@
 ﻿from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from sqlalchemy import or_
 
-from app.models import Chat, ChatMembership, Message, User
+from app.models import Chat, ChatMembership, Message, MessageAttachment, User
 from app.services import ChatService, MessageService
 
 
@@ -125,6 +126,50 @@ def get_messages(chat_id: int):
             "messages": [serialize_message(message) for message in messages],
             "has_more": has_more,
             "next_before": messages[0].id if messages else None,
+        }
+    )
+
+
+@chats_bp.get("/<int:chat_id>/messages/search")
+@jwt_required()
+def search_messages(chat_id: int):
+    user_id = int(get_jwt_identity())
+    membership = ChatMembership.query.filter_by(chat_id=chat_id, user_id=user_id).first()
+    if not membership:
+        return jsonify({"error": "Доступ к чату запрещен"}), 403
+
+    query_text = (request.args.get("q") or "").strip()
+    if not query_text:
+        return jsonify({"messages": [], "query": ""})
+
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        limit = 50
+
+    limit = min(max(limit, 1), 100)
+    query_text = query_text[:120]
+    like_pattern = f"%{query_text}%"
+
+    matched_messages = (
+        Message.query
+        .filter(
+            Message.chat_id == chat_id,
+            Message.is_deleted.is_(False),
+            or_(
+                Message.content.ilike(like_pattern),
+                Message.attachments.any(MessageAttachment.file_name.ilike(like_pattern)),
+            ),
+        )
+        .order_by(Message.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return jsonify(
+        {
+            "query": query_text,
+            "messages": [serialize_message(message) for message in matched_messages],
         }
     )
 

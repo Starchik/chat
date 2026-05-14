@@ -1394,6 +1394,188 @@
         });
     }
 
+    function summarizeSearchMessage(message) {
+        const content = (message?.content || "").trim();
+        if (content) {
+            return content;
+        }
+
+        const attachments = Array.isArray(message?.attachments) ? message.attachments : [];
+        if (!attachments.length) {
+            return "Пустое сообщение";
+        }
+
+        const imageCount = attachments.filter((item) => item?.kind === "image").length;
+        if (imageCount > 0 && imageCount === attachments.length) {
+            return imageCount > 1 ? `Фото (${imageCount})` : "Фото";
+        }
+
+        const first = attachments[0];
+        if (first?.file_name) {
+            return first.file_name;
+        }
+        return "Вложение";
+    }
+
+    function truncateText(text, maxLength = 140) {
+        const value = String(text || "");
+        if (value.length <= maxLength) {
+            return value;
+        }
+        return `${value.slice(0, maxLength - 1)}…`;
+    }
+
+    function openSearchModal() {
+        const chatId = Number(state.currentChatId);
+        if (!chatId) {
+            helpers.showToast("Сначала выберите чат");
+            return;
+        }
+
+        const currentChat = getCurrentChat();
+        const chatTitle = helpers.escapeHtml(currentChat?.title || "Текущий чат");
+
+        helpers.showModal(`
+            <h3>Поиск сообщений</h3>
+            <div class="message-search-modal">
+                <div class="message-search-modal__chat">${chatTitle}</div>
+                <div class="input-wrap message-search-modal__input-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input id="message-search-input" type="search" placeholder="Текст сообщения или имя файла" autocomplete="off" />
+                </div>
+                <div id="message-search-status" class="message-search-modal__status">Введите текст для поиска</div>
+                <div id="message-search-results" class="message-search-modal__results custom-scroll"></div>
+                <div class="modal-actions">
+                    <button id="message-search-close-btn" class="btn btn-soft" type="button">Закрыть</button>
+                </div>
+            </div>
+        `, () => {
+            const input = document.getElementById("message-search-input");
+            const status = document.getElementById("message-search-status");
+            const resultsContainer = document.getElementById("message-search-results");
+            const closeButton = document.getElementById("message-search-close-btn");
+
+            if (!input || !status || !resultsContainer || !closeButton) {
+                return;
+            }
+
+            closeButton.addEventListener("click", helpers.hideModal);
+
+            let debounceId = null;
+            let requestSeq = 0;
+            let latestRenderedSeq = 0;
+            let currentResults = [];
+
+            const focusMessage = async (messageId) => {
+                if (!messageId) {
+                    return;
+                }
+                helpers.hideModal();
+                const found = await jumpToMessage(messageId);
+                if (!found) {
+                    helpers.showToast("Сообщение не найдено");
+                }
+            };
+
+            const renderResults = (messages) => {
+                currentResults = Array.isArray(messages) ? messages : [];
+                resultsContainer.innerHTML = "";
+
+                if (!currentResults.length) {
+                    status.textContent = "Совпадений не найдено";
+                    return;
+                }
+
+                status.textContent = `Найдено: ${currentResults.length}`;
+                currentResults.forEach((message) => {
+                    const item = document.createElement("button");
+                    item.type = "button";
+                    item.className = "message-search-modal__item";
+                    item.dataset.messageId = String(message.id);
+
+                    const senderName = message.sender_id === state.me?.id
+                        ? "Вы"
+                        : (message.sender?.display_name || message.sender?.username || "Пользователь");
+                    const snippet = truncateText(summarizeSearchMessage(message), 160);
+                    const timeLabel = helpers.formatChatTime(message.created_at);
+
+                    item.innerHTML = `
+                        <div class="message-search-modal__item-meta">
+                            <span class="message-search-modal__item-author">${helpers.escapeHtml(senderName)}</span>
+                            <span class="message-search-modal__item-time">${helpers.escapeHtml(timeLabel)}</span>
+                        </div>
+                        <div class="message-search-modal__item-text">${helpers.escapeHtml(snippet)}</div>
+                    `;
+
+                    item.addEventListener("click", () => {
+                        void focusMessage(Number(item.dataset.messageId));
+                    });
+
+                    resultsContainer.appendChild(item);
+                });
+            };
+
+            const performSearch = async () => {
+                const query = input.value.trim();
+                if (!query) {
+                    requestSeq += 1;
+                    latestRenderedSeq = requestSeq;
+                    currentResults = [];
+                    resultsContainer.innerHTML = "";
+                    status.textContent = "Введите текст для поиска";
+                    return;
+                }
+
+                const seq = ++requestSeq;
+                status.textContent = "Поиск...";
+                resultsContainer.innerHTML = "";
+
+                try {
+                    const response = await api.searchChatMessages(chatId, query, 80);
+                    if (seq < latestRenderedSeq) {
+                        return;
+                    }
+                    latestRenderedSeq = seq;
+                    renderResults(response.messages || []);
+                } catch (error) {
+                    if (seq < latestRenderedSeq) {
+                        return;
+                    }
+                    latestRenderedSeq = seq;
+                    currentResults = [];
+                    resultsContainer.innerHTML = "";
+                    status.textContent = "Ошибка поиска";
+                    helpers.showToast(error.message || "Не удалось выполнить поиск");
+                }
+            };
+
+            input.addEventListener("input", () => {
+                window.clearTimeout(debounceId);
+                debounceId = window.setTimeout(() => {
+                    void performSearch();
+                }, 220);
+            });
+
+            input.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    helpers.hideModal();
+                    return;
+                }
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    if (currentResults.length) {
+                        void focusMessage(Number(currentResults[0].id));
+                    } else {
+                        void performSearch();
+                    }
+                }
+            });
+
+            input.focus();
+        });
+    }
+
     async function sendMessage() {
         if (!state.currentChatId) {
             helpers.showToast("Сначала выберите чат");
@@ -2065,6 +2247,7 @@
         onMessageUnpinned,
         onMessagesRead,
         onTypingPayload,
+        openSearchModal,
         renderTypingIndicator,
     };
 }

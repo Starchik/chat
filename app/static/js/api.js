@@ -174,6 +174,13 @@
             return apiRequest(`/chats/${chatId}/messages?${params.toString()}`, { method: "GET" });
         },
 
+        searchChatMessages(chatId, query, limit = 50) {
+            const params = new URLSearchParams();
+            params.set("q", String(query || ""));
+            params.set("limit", String(limit));
+            return apiRequest(`/chats/${chatId}/messages/search?${params.toString()}`, { method: "GET" });
+        },
+
         markChatRead(chatId, messageId = null) {
             return apiRequest(`/chats/${chatId}/read`, {
                 method: "POST",

@@ -62,6 +62,7 @@ const refs = {
 
     contextMenu: document.getElementById("context-menu"),
     chatActionsMenu: document.getElementById("chat-actions-menu"),
+    chatSearchAction: document.getElementById("chat-search-action"),
     chatArchiveAction: document.getElementById("chat-archive-action"),
     modalOverlay: document.getElementById("modal-overlay"),
     modal: document.getElementById("modal"),
@@ -217,6 +218,15 @@ function updateChatArchiveAction(chat = null) {
     }
 }
 
+function updateChatSearchAction(chat = null) {
+    if (!refs.chatSearchAction) {
+        return;
+    }
+
+    const currentChat = chat || state.chats.find((item) => item.id === state.currentChatId) || null;
+    refs.chatSearchAction.disabled = !currentChat;
+}
+
 function openChatActionsMenu() {
     if (!refs.menuActionBtn || refs.menuActionBtn.disabled || !refs.chatActionsMenu) {
         return;
@@ -224,6 +234,7 @@ function openChatActionsMenu() {
 
     const currentChat = state.chats.find((item) => item.id === state.currentChatId) || null;
     updateChatArchiveAction(currentChat);
+    updateChatSearchAction(currentChat);
 
     const rect = refs.menuActionBtn.getBoundingClientRect();
     openFloatingMenu(refs.chatActionsMenu, rect.right, rect.bottom + 6);
@@ -353,6 +364,7 @@ function setChatHeader(chat) {
             refs.menuActionBtn.disabled = true;
         }
         updateChatArchiveAction(null);
+        updateChatSearchAction(null);
         closeChatActionsMenu();
         clearPinnedBanner();
         return;
@@ -368,6 +380,7 @@ function setChatHeader(chat) {
         refs.menuActionBtn.disabled = false;
     }
     updateChatArchiveAction(chat);
+    updateChatSearchAction(chat);
     refs.chatAvatar.src = chat.avatar_url || avatarFallback(chat.title, true);
     refs.chatTitle.textContent = chat.title || "Без названия";
 
@@ -466,6 +479,13 @@ function bindBaseEvents(app) {
         await app.modules.chats.toggleArchiveForCurrentChat();
         const nextChat = app.modules.chats.getChatById(state.currentChatId);
         updateChatArchiveAction(nextChat || null);
+    });
+    refs.chatSearchAction?.addEventListener("click", () => {
+        closeChatActionsMenu();
+        if (!app.modules?.messages?.openSearchModal) {
+            return;
+        }
+        app.modules.messages.openSearchModal();
     });
 
     refs.modalOverlay.addEventListener("click", (event) => {
