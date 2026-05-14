@@ -98,21 +98,21 @@
 }
 
 .message--mine {
-    background: linear-gradient(145deg, rgba(54, 162, 230, 0.86), rgba(65, 96, 214, 0.84));
-    border-color: rgba(171, 219, 255, 0.42);
+    background: linear-gradient(145deg, rgba(34, 101, 184, 0.9), rgba(22, 56, 126, 0.92));
+    border-color: rgba(137, 190, 246, 0.32);
     box-shadow:
-        0 12px 30px rgba(28, 84, 165, 0.3),
-        0 0 0 1px rgba(143, 206, 255, 0.1);
+        0 11px 26px rgba(11, 39, 91, 0.38),
+        0 0 0 1px rgba(126, 183, 243, 0.08);
 }
 
 .message--mine:hover {
     box-shadow:
-        0 15px 34px rgba(30, 92, 180, 0.34),
-        0 0 0 1px rgba(160, 218, 255, 0.14);
+        0 14px 30px rgba(12, 45, 103, 0.42),
+        0 0 0 1px rgba(142, 198, 252, 0.12);
 }
 
 .message--mine::before {
-    background: radial-gradient(160px circle at var(--glow-x) var(--glow-y), rgba(214, 241, 255, 0.24), transparent 72%);
+    background: radial-gradient(160px circle at var(--glow-x) var(--glow-y), rgba(184, 223, 255, 0.18), transparent 72%);
 }
 
 [data-theme="light"] .message {
@@ -133,15 +133,15 @@
 }
 
 [data-theme="light"] .message--mine {
-    background: linear-gradient(145deg, rgba(70, 170, 236, 0.9), rgba(88, 108, 226, 0.86));
-    border-color: rgba(120, 180, 235, 0.35);
+    background: linear-gradient(145deg, rgba(44, 126, 206, 0.92), rgba(31, 78, 168, 0.9));
+    border-color: rgba(95, 155, 220, 0.3);
     box-shadow:
-        0 10px 24px rgba(35, 94, 170, 0.2),
-        0 0 0 1px rgba(112, 173, 230, 0.12);
+        0 10px 22px rgba(23, 67, 136, 0.26),
+        0 0 0 1px rgba(106, 166, 228, 0.1);
 }
 
 [data-theme="light"] .message--mine::before {
-    background: radial-gradient(160px circle at var(--glow-x) var(--glow-y), rgba(255, 255, 255, 0.24), transparent 74%);
+    background: radial-gradient(160px circle at var(--glow-x) var(--glow-y), rgba(236, 246, 255, 0.2), transparent 74%);
 }
 
 .message--mine .message__meta,
