@@ -77,6 +77,8 @@ export function initCallsModule(app) {
     let ringtoneContext = null;
     let ringtoneMasterGain = null;
     let ringtoneLoopTimerId = null;
+    let ringtoneUnlockHandlersBound = false;
+    let pendingRingtoneDirection = null;
 
     function getPeerConnectionCtor() {
         return window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || null;
@@ -166,11 +168,67 @@ export function initCallsModule(app) {
             ringtoneMasterGain.connect(ringtoneContext.destination);
         }
 
-        if (ringtoneContext.state === "suspended") {
+        if (ringtoneContext.state !== "running") {
             ringtoneContext.resume().catch(() => {});
         }
 
         return ringtoneContext;
+    }
+
+    function unlockRingtoneAudio() {
+        const context = ensureRingtoneContext();
+        if (!context) {
+            return false;
+        }
+
+        if (context.state !== "running") {
+            context.resume().catch(() => {});
+        }
+
+        try {
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+            gainNode.gain.value = 0.00001;
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.01);
+        } catch (_error) {
+            // Ignore unlock probe errors.
+        }
+
+        if (pendingRingtoneDirection && currentCall?.phase === "ringing") {
+            const nextDirection = pendingRingtoneDirection;
+            pendingRingtoneDirection = null;
+            startRingtone(nextDirection);
+        }
+
+        return true;
+    }
+
+    function bindRingtoneUnlockHandlers() {
+        if (ringtoneUnlockHandlersBound) {
+            return;
+        }
+
+        ringtoneUnlockHandlersBound = true;
+
+        const unlockHandler = () => {
+            unlockRingtoneAudio();
+        };
+
+        const listenerOptions = { passive: true };
+        window.addEventListener("pointerdown", unlockHandler, listenerOptions);
+        window.addEventListener("touchstart", unlockHandler, listenerOptions);
+        window.addEventListener("mousedown", unlockHandler, listenerOptions);
+        window.addEventListener("keydown", unlockHandler);
+        window.addEventListener("focus", unlockHandler);
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                unlockRingtoneAudio();
+            }
+        });
     }
 
     function scheduleRingtoneTone(context, startAt, note, volume = 0.24) {
@@ -203,7 +261,7 @@ export function initCallsModule(app) {
     function playRingtonePattern(pattern) {
         const context = ensureRingtoneContext();
         if (!context || !ringtoneMasterGain || !Array.isArray(pattern) || !pattern.length) {
-            return;
+            return false;
         }
 
         const startAt = context.currentTime + 0.02;
@@ -221,12 +279,20 @@ export function initCallsModule(app) {
             }
             playRingtonePattern(pattern);
         }, loopDurationMs);
+
+        return true;
     }
 
     function startRingtone(direction = "incoming") {
         stopRingtone();
         const pattern = ringtonePatterns[direction] || ringtonePatterns.incoming;
-        playRingtonePattern(pattern);
+        const started = playRingtonePattern(pattern);
+
+        if (!started) {
+            pendingRingtoneDirection = direction;
+        }
+
+        return started;
     }
 
     function stopRingtone() {
@@ -234,6 +300,7 @@ export function initCallsModule(app) {
             window.clearTimeout(ringtoneLoopTimerId);
             ringtoneLoopTimerId = null;
         }
+        pendingRingtoneDirection = null;
     }
 
     function stopStream(stream) {
@@ -975,7 +1042,10 @@ export function initCallsModule(app) {
     }
 
     function bindEvents() {
+        bindRingtoneUnlockHandlers();
+
         callRefs.acceptBtn?.addEventListener("click", () => {
+            unlockRingtoneAudio();
             void acceptIncomingCall();
         });
 
@@ -999,10 +1069,12 @@ export function initCallsModule(app) {
         });
 
         refs.callActionBtn?.addEventListener("click", () => {
+            unlockRingtoneAudio();
             void startCall("audio");
         });
 
         refs.videoActionBtn?.addEventListener("click", () => {
+            unlockRingtoneAudio();
             void startCall("video");
         });
     }
