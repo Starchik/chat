@@ -1,5 +1,9 @@
 ﻿(function (global) {
     const API_BASE = window.APP_CONFIG.apiBase;
+    const DEFAULT_UPLOAD_CHUNK_SIZE = Math.max(
+        64 * 1024,
+        Number(window.APP_CONFIG.uploadChunkSize) || (1024 * 1024),
+    );
 
     async function apiRequest(path, options = {}) {
         const token = global.AppStorage.getToken();
@@ -30,6 +34,53 @@
         }
 
         return payload;
+    }
+
+    async function initChunkUpload({ chatId, file }) {
+        return apiRequest("/messages/uploads/init", {
+            method: "POST",
+            body: JSON.stringify({
+                chat_id: chatId,
+                file_name: file.name,
+                file_size: file.size,
+                mime_type: file.type || "application/octet-stream",
+            }),
+        });
+    }
+
+    async function uploadFileInChunks({ chatId, file }) {
+        const initPayload = await initChunkUpload({ chatId, file });
+        const uploadId = String(initPayload.upload_id || "").trim();
+        const chunkSize = Math.max(
+            64 * 1024,
+            Number(initPayload.chunk_size) || DEFAULT_UPLOAD_CHUNK_SIZE,
+        );
+        const totalChunks = Math.max(
+            1,
+            Number(initPayload.total_chunks) || Math.ceil(file.size / chunkSize),
+        );
+
+        if (!uploadId) {
+            throw new Error("Сервер не вернул upload_id");
+        }
+
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+            const start = chunkIndex * chunkSize;
+            const end = Math.min(file.size, start + chunkSize);
+            const chunkBlob = file.slice(start, end);
+
+            const formData = new FormData();
+            formData.append("upload_id", uploadId);
+            formData.append("chunk_index", String(chunkIndex));
+            formData.append("chunk", chunkBlob, file.name);
+
+            await apiRequest("/messages/uploads/chunk", {
+                method: "POST",
+                body: formData,
+            });
+        }
+
+        return uploadId;
     }
 
     const Api = {
@@ -111,24 +162,22 @@
 
         async sendMessage({ chatId, content, replyToId = null, forwardFromId = null, files = [] }) {
             if (files.length > 0) {
-                const formData = new FormData();
-                formData.append("chat_id", String(chatId));
-                if (content) {
-                    formData.append("content", content);
+                const uploadIds = [];
+
+                for (const file of files) {
+                    const uploadId = await uploadFileInChunks({ chatId, file });
+                    uploadIds.push(uploadId);
                 }
-                if (replyToId) {
-                    formData.append("reply_to_id", String(replyToId));
-                }
-                if (forwardFromId) {
-                    formData.append("forwarded_from_message_id", String(forwardFromId));
-                }
-                files.forEach((file) => {
-                    formData.append("files", file);
-                });
 
                 return apiRequest("/messages", {
                     method: "POST",
-                    body: formData,
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        content,
+                        reply_to_id: replyToId,
+                        forwarded_from_message_id: forwardFromId,
+                        upload_ids: uploadIds,
+                    }),
                 });
             }
 

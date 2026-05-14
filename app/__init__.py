@@ -3,7 +3,8 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, url_for
+from flask import Flask, jsonify, render_template, request, url_for
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from app.api import register_api
 from app.config import Config
@@ -52,6 +53,7 @@ def create_app():
             app.config["UPLOAD_BASE_FOLDER"],
             app.config["AVATAR_UPLOAD_FOLDER"],
             app.config["FILE_UPLOAD_FOLDER"],
+            app.config["CHUNK_UPLOAD_FOLDER"],
         ]
     )
 
@@ -83,6 +85,7 @@ def create_app():
                 "webrtc_ringtone_outgoing_url": app.config.get("WEBRTC_RINGTONE_OUTGOING_URL", ""),
                 "webrtc_ringtone_incoming_volume": float(app.config.get("WEBRTC_RINGTONE_INCOMING_VOLUME", 0.88)),
                 "webrtc_ringtone_outgoing_volume": float(app.config.get("WEBRTC_RINGTONE_OUTGOING_VOLUME", 0.72)),
+                "upload_chunk_size": int(app.config.get("UPLOAD_CHUNK_SIZE", 1024 * 1024)),
             }
         }
 
@@ -117,5 +120,19 @@ def create_app():
             response.headers["Expires"] = "0"
 
         return response
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_request_entity_too_large(_error):
+        max_length = int(app.config.get("MAX_CONTENT_LENGTH", 0))
+        max_mb = round(max_length / (1024 * 1024), 2) if max_length > 0 else 0
+        message = (
+            f"Файл слишком большой для одного запроса (лимит: {max_mb} MB). "
+            "Повторите отправку через загрузку частями."
+        )
+
+        if (request.path or "").startswith("/api/"):
+            return jsonify({"error": message}), 413
+
+        return message, 413
 
     return app

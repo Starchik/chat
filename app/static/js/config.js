@@ -1,10 +1,11 @@
 ﻿window.APP_CONFIG = {
     apiBase: "/api",
     socketPath: "/socket.io",
-    cacheVersion: "v8",
+    cacheVersion: "v9",
     messagePageSize: 30,
     maxCachedMessages: 500,
     maxUploadFiles: 10,
+    uploadChunkSize: Math.max(64 * 1024, Number(window.APP_RUNTIME?.upload_chunk_size) || (1024 * 1024)),
     webrtcIceServers: Array.isArray(window.APP_RUNTIME?.webrtc_ice_servers)
         ? window.APP_RUNTIME.webrtc_ice_servers
         : [{ urls: "stun:stun.l.google.com:19302" }],

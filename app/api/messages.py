@@ -1,4 +1,9 @@
-﻿import os
+﻿import json
+import math
+import os
+import re
+import secrets
+import time
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -6,13 +11,21 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.extensions import socketio
 from app.models import Chat, ChatMembership, Message
 from app.services import ChatService, MessageService, PushService
-from app.utils import (
-    make_storage_filename,
-    sanitize_filename,
-)
+from app.utils import make_storage_filename, sanitize_filename
 
 
 messages_bp = Blueprint("messages", __name__, url_prefix="/messages")
+UPLOAD_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
+
+
+def _attachment_kind_for_name(safe_name: str):
+    ext = safe_name.rsplit(".", 1)[1].lower() if "." in safe_name else ""
+
+    if ext in current_app.config["ALLOWED_IMAGE_EXTENSIONS"]:
+        return "image"
+    if ext in current_app.config["ALLOWED_FILE_EXTENSIONS"]:
+        return "file"
+    return None
 
 
 def _store_uploaded_files(files):
@@ -24,12 +37,8 @@ def _store_uploaded_files(files):
             continue
 
         safe_name = sanitize_filename(original_name)
-        ext = safe_name.rsplit(".", 1)[1].lower() if "." in safe_name else ""
-
-        is_image = ext in current_app.config["ALLOWED_IMAGE_EXTENSIONS"]
-        is_file = ext in current_app.config["ALLOWED_FILE_EXTENSIONS"]
-
-        if not is_image and not is_file:
+        kind = _attachment_kind_for_name(safe_name)
+        if not kind:
             return None, {"error": f"Файл '{safe_name}' имеет неподдерживаемый формат"}, 400
 
         stored_name = make_storage_filename(safe_name)
@@ -45,9 +54,193 @@ def _store_uploaded_files(files):
                 "file_url": f"/static/uploads/files/{stored_name}",
                 "mime_type": file.mimetype or "application/octet-stream",
                 "file_size": file_size,
-                "kind": "image" if is_image else "file",
+                "kind": kind,
             }
         )
+
+    return attachments, None, None
+
+
+def _is_valid_upload_id(upload_id: str) -> bool:
+    return bool(upload_id and UPLOAD_ID_PATTERN.fullmatch(upload_id))
+
+
+def _chunk_meta_path(upload_id: str):
+    return current_app.config["CHUNK_UPLOAD_FOLDER"] / f"{upload_id}.json"
+
+
+def _chunk_part_path(upload_id: str):
+    return current_app.config["CHUNK_UPLOAD_FOLDER"] / f"{upload_id}.part"
+
+
+def _write_chunk_meta(upload_id: str, meta: dict):
+    _chunk_meta_path(upload_id).write_text(
+        json.dumps(meta, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+
+def _read_chunk_meta(upload_id: str):
+    path = _chunk_meta_path(upload_id)
+    if not path.exists():
+        return None
+
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _cleanup_stale_chunk_uploads():
+    base_folder = current_app.config["CHUNK_UPLOAD_FOLDER"]
+    ttl_sec = max(300, int(current_app.config.get("CHUNK_UPLOAD_TTL_SEC", 7200)))
+    now = int(time.time())
+
+    for meta_path in base_folder.glob("*.json"):
+        stale = False
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            updated_at = int(meta.get("updated_at") or meta.get("created_at") or 0)
+            stale = updated_at <= 0 or (now - updated_at) > ttl_sec
+        except Exception:
+            stale = True
+
+        if not stale:
+            continue
+
+        upload_id = meta_path.stem
+        part_path = _chunk_part_path(upload_id)
+
+        try:
+            meta_path.unlink()
+        except FileNotFoundError:
+            pass
+
+        try:
+            part_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    for part_path in base_folder.glob("*.part"):
+        upload_id = part_path.stem
+        if _chunk_meta_path(upload_id).exists():
+            continue
+
+        age_sec = now - int(part_path.stat().st_mtime)
+        if age_sec <= ttl_sec:
+            continue
+
+        try:
+            part_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _normalize_upload_ids(raw_value):
+    if raw_value is None:
+        return []
+
+    items = []
+
+    if isinstance(raw_value, list):
+        items = raw_value
+    elif isinstance(raw_value, str):
+        text = raw_value.strip()
+        if not text:
+            return []
+
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+                if isinstance(parsed, list):
+                    items = parsed
+                else:
+                    items = [text]
+            except Exception:
+                items = [text]
+        elif "," in text:
+            items = text.split(",")
+        else:
+            items = [text]
+
+    normalized = []
+    for item in items:
+        if item is None:
+            continue
+        value = str(item).strip()
+        if value:
+            normalized.append(value)
+
+    return normalized
+
+
+def _consume_chunk_uploads(upload_ids, user_id: int, chat_id: int):
+    if not upload_ids:
+        return [], None, None
+
+    attachments = []
+    consumed = set()
+
+    for upload_id in upload_ids:
+        if upload_id in consumed:
+            continue
+
+        if not _is_valid_upload_id(upload_id):
+            return None, {"error": "Некорректный upload_id"}, 400
+
+        meta = _read_chunk_meta(upload_id)
+        if not meta:
+            return None, {"error": "Загрузка не найдена или уже просрочена"}, 400
+
+        if int(meta.get("user_id", 0)) != user_id:
+            return None, {"error": "Эта загрузка принадлежит другому пользователю"}, 403
+
+        if int(meta.get("chat_id", 0)) != chat_id:
+            return None, {"error": "Эта загрузка принадлежит другому чату"}, 403
+
+        total_chunks = int(meta.get("total_chunks", 0))
+        received_chunks = int(meta.get("received_chunks", 0))
+        file_size = int(meta.get("file_size", 0))
+        bytes_received = int(meta.get("bytes_received", 0))
+
+        if total_chunks <= 0 or received_chunks < total_chunks or bytes_received != file_size:
+            return None, {"error": "Файл еще не загружен полностью"}, 400
+
+        part_path = _chunk_part_path(upload_id)
+        if not part_path.exists():
+            return None, {"error": "Временный файл загрузки не найден"}, 400
+
+        stored_name = str(meta.get("stored_name") or "").strip()
+        file_name = str(meta.get("file_name") or "").strip()
+        kind = str(meta.get("kind") or "file")
+        mime_type = str(meta.get("mime_type") or "application/octet-stream")
+
+        if not stored_name or not file_name:
+            return None, {"error": "Поврежденные метаданные загрузки"}, 400
+
+        final_path = current_app.config["FILE_UPLOAD_FOLDER"] / stored_name
+
+        try:
+            os.replace(part_path, final_path)
+        except Exception:
+            return None, {"error": "Не удалось сохранить загруженный файл"}, 500
+
+        try:
+            _chunk_meta_path(upload_id).unlink()
+        except FileNotFoundError:
+            pass
+
+        attachments.append(
+            {
+                "file_name": file_name,
+                "stored_name": stored_name,
+                "file_url": f"/static/uploads/files/{stored_name}",
+                "mime_type": mime_type,
+                "file_size": os.path.getsize(final_path),
+                "kind": "image" if kind == "image" else "file",
+            }
+        )
+        consumed.add(upload_id)
 
     return attachments, None, None
 
@@ -64,6 +257,170 @@ def _broadcast_chat_update(chat_id: int):
         )
 
 
+@messages_bp.post("/uploads/init")
+@jwt_required()
+def init_chunk_upload():
+    user_id = int(get_jwt_identity())
+    payload = request.get_json(silent=True) or {}
+
+    chat_id_raw = payload.get("chat_id")
+    file_name_raw = payload.get("file_name")
+    file_size_raw = payload.get("file_size")
+    mime_type = str(payload.get("mime_type") or "application/octet-stream").strip() or "application/octet-stream"
+
+    if not chat_id_raw or not str(chat_id_raw).isdigit():
+        return jsonify({"error": "chat_id обязателен"}), 400
+
+    chat_id = int(chat_id_raw)
+    membership = ChatMembership.query.filter_by(chat_id=chat_id, user_id=user_id).first()
+    if not membership:
+        return jsonify({"error": "Доступ к чату запрещен"}), 403
+
+    safe_name = sanitize_filename(str(file_name_raw or ""))
+    if not safe_name:
+        return jsonify({"error": "Имя файла обязательно"}), 400
+
+    kind = _attachment_kind_for_name(safe_name)
+    if not kind:
+        return jsonify({"error": f"Файл '{safe_name}' имеет неподдерживаемый формат"}), 400
+
+    try:
+        file_size = int(file_size_raw)
+    except Exception:
+        return jsonify({"error": "Некорректный file_size"}), 400
+
+    if file_size <= 0:
+        return jsonify({"error": "Размер файла должен быть больше 0"}), 400
+
+    max_chunked_file_size = int(current_app.config.get("MAX_CHUNKED_FILE_SIZE", 1024 * 1024 * 1024))
+    if max_chunked_file_size > 0 and file_size > max_chunked_file_size:
+        max_mb = round(max_chunked_file_size / (1024 * 1024), 2)
+        return jsonify({"error": f"Файл слишком большой (лимит: {max_mb} MB)"}), 413
+
+    _cleanup_stale_chunk_uploads()
+
+    requested_chunk_size = int(current_app.config.get("UPLOAD_CHUNK_SIZE", 1024 * 1024))
+    max_request_size = int(current_app.config.get("MAX_CONTENT_LENGTH") or 0)
+
+    effective_chunk_size = max(64 * 1024, requested_chunk_size)
+    if max_request_size > 0:
+        # Keep chunk safely lower than the Flask request-size limit.
+        effective_chunk_size = min(effective_chunk_size, max(64 * 1024, max_request_size - 256 * 1024))
+
+    total_chunks = max(1, math.ceil(file_size / effective_chunk_size))
+    upload_id = secrets.token_hex(16)
+    stored_name = make_storage_filename(safe_name)
+    now = int(time.time())
+
+    meta = {
+        "upload_id": upload_id,
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "file_name": safe_name,
+        "stored_name": stored_name,
+        "file_size": file_size,
+        "mime_type": mime_type,
+        "kind": kind,
+        "chunk_size": effective_chunk_size,
+        "total_chunks": total_chunks,
+        "received_chunks": 0,
+        "bytes_received": 0,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    _write_chunk_meta(upload_id, meta)
+    _chunk_part_path(upload_id).write_bytes(b"")
+
+    return jsonify(
+        {
+            "upload_id": upload_id,
+            "chunk_size": effective_chunk_size,
+            "total_chunks": total_chunks,
+            "file_size": file_size,
+            "file_name": safe_name,
+        }
+    )
+
+
+@messages_bp.post("/uploads/chunk")
+@jwt_required()
+def upload_chunk():
+    user_id = int(get_jwt_identity())
+
+    upload_id = str(request.form.get("upload_id") or "").strip()
+    chunk_index_raw = request.form.get("chunk_index")
+    chunk_file = request.files.get("chunk")
+
+    if not _is_valid_upload_id(upload_id):
+        return jsonify({"error": "Некорректный upload_id"}), 400
+
+    if chunk_index_raw is None or not str(chunk_index_raw).isdigit():
+        return jsonify({"error": "chunk_index обязателен"}), 400
+
+    chunk_index = int(chunk_index_raw)
+    if chunk_index < 0:
+        return jsonify({"error": "Некорректный chunk_index"}), 400
+
+    if chunk_file is None:
+        return jsonify({"error": "Чанк не передан"}), 400
+
+    meta = _read_chunk_meta(upload_id)
+    if not meta:
+        return jsonify({"error": "Загрузка не найдена или уже просрочена"}), 404
+
+    if int(meta.get("user_id", 0)) != user_id:
+        return jsonify({"error": "Эта загрузка принадлежит другому пользователю"}), 403
+
+    total_chunks = int(meta.get("total_chunks", 0))
+    received_chunks = int(meta.get("received_chunks", 0))
+    bytes_received = int(meta.get("bytes_received", 0))
+    file_size = int(meta.get("file_size", 0))
+    chunk_size_limit = int(meta.get("chunk_size", 0))
+
+    if chunk_index >= total_chunks:
+        return jsonify({"error": "chunk_index вне диапазона"}), 400
+
+    if chunk_index != received_chunks:
+        return jsonify({"error": "Неверный порядок чанков"}), 409
+
+    chunk_bytes = chunk_file.read() or b""
+    chunk_size = len(chunk_bytes)
+    if chunk_size <= 0:
+        return jsonify({"error": "Пустой чанк не допускается"}), 400
+
+    if chunk_size_limit > 0 and chunk_size > chunk_size_limit:
+        return jsonify({"error": "Размер чанка превышает лимит"}), 413
+
+    remaining = file_size - bytes_received
+    if remaining <= 0:
+        return jsonify({"error": "Загрузка уже завершена"}), 400
+
+    if chunk_size > remaining:
+        return jsonify({"error": "Размер чанка больше ожидаемого"}), 400
+
+    with _chunk_part_path(upload_id).open("ab") as part_file:
+        part_file.write(chunk_bytes)
+
+    meta["received_chunks"] = received_chunks + 1
+    meta["bytes_received"] = bytes_received + chunk_size
+    meta["updated_at"] = int(time.time())
+    _write_chunk_meta(upload_id, meta)
+
+    completed = int(meta["bytes_received"]) == int(meta["file_size"]) and int(meta["received_chunks"]) == int(meta["total_chunks"])
+
+    return jsonify(
+        {
+            "upload_id": upload_id,
+            "received_chunks": int(meta["received_chunks"]),
+            "total_chunks": int(meta["total_chunks"]),
+            "bytes_received": int(meta["bytes_received"]),
+            "file_size": int(meta["file_size"]),
+            "completed": completed,
+        }
+    )
+
+
 @messages_bp.post("")
 @jwt_required()
 def send_message():
@@ -75,6 +432,7 @@ def send_message():
         reply_to_id = request.form.get("reply_to_id")
         forwarded_from_message_id = request.form.get("forwarded_from_message_id")
         files = request.files.getlist("files")
+        upload_ids = _normalize_upload_ids(request.form.getlist("upload_ids"))
     else:
         payload = request.get_json(silent=True) or {}
         chat_id = payload.get("chat_id")
@@ -82,16 +440,28 @@ def send_message():
         reply_to_id = payload.get("reply_to_id")
         forwarded_from_message_id = payload.get("forwarded_from_message_id")
         files = []
+        upload_ids = _normalize_upload_ids(payload.get("upload_ids"))
 
     if not chat_id or not str(chat_id).isdigit():
         return jsonify({"error": "chat_id обязателен"}), 400
 
-    attachments_payload, error, status = _store_uploaded_files(files)
+    chat_id_int = int(chat_id)
+    membership = ChatMembership.query.filter_by(chat_id=chat_id_int, user_id=user_id).first()
+    if not membership:
+        return jsonify({"error": "Доступ к чату запрещен"}), 403
+
+    direct_attachments, error, status = _store_uploaded_files(files)
     if error:
         return jsonify(error), status
 
+    chunk_attachments, error, status = _consume_chunk_uploads(upload_ids, user_id=user_id, chat_id=chat_id_int)
+    if error:
+        return jsonify(error), status
+
+    attachments_payload = (direct_attachments or []) + (chunk_attachments or [])
+
     message, error, status = MessageService.create_message(
-        chat_id=int(chat_id),
+        chat_id=chat_id_int,
         sender_id=user_id,
         content=content,
         reply_to_id=int(reply_to_id) if reply_to_id and str(reply_to_id).isdigit() else None,
@@ -224,4 +594,3 @@ def unpin_message(message_id: int):
     socketio.emit("message_unpinned", payload, room=f"chat_{message.chat_id}")
     _broadcast_chat_update(message.chat_id)
     return jsonify(payload)
-

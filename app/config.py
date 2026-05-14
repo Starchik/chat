@@ -159,6 +159,9 @@ class Config:
     JWT_TOKEN_LOCATION = ["headers"]
 
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(20 * 1024 * 1024)))
+    UPLOAD_CHUNK_SIZE = int(os.getenv("UPLOAD_CHUNK_SIZE", str(1024 * 1024)))
+    MAX_CHUNKED_FILE_SIZE = int(os.getenv("MAX_CHUNKED_FILE_SIZE", str(1024 * 1024 * 1024)))
+    CHUNK_UPLOAD_TTL_SEC = int(os.getenv("CHUNK_UPLOAD_TTL_SEC", "7200"))
     ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
     ALLOWED_FILE_EXTENSIONS = {
         "txt", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "rar",
@@ -168,6 +171,7 @@ class Config:
     UPLOAD_BASE_FOLDER = BASE_DIR / "app" / "static" / "uploads"
     AVATAR_UPLOAD_FOLDER = UPLOAD_BASE_FOLDER / "avatars"
     FILE_UPLOAD_FOLDER = UPLOAD_BASE_FOLDER / "files"
+    CHUNK_UPLOAD_FOLDER = INSTANCE_DIR / "chunk_uploads"
 
     VAPID_PRIVATE_KEY_PATH = os.getenv(
         "VAPID_PRIVATE_KEY_PATH",
