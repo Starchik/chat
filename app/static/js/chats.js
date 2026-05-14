@@ -49,7 +49,15 @@
 
         if (lastMessage.attachments?.length) {
             const first = lastMessage.attachments[0];
-            return first.kind === "image" ? "Фото" : "Файл";
+            if (first.kind === "image") {
+                return "Фото";
+            }
+            const mime = String(first.mime_type || "").toLowerCase();
+            const fileName = String(first.file_name || "").toLowerCase();
+            if (mime.startsWith("audio/") || (fileName.startsWith("voice-") && fileName.endsWith(".webm"))) {
+                return "Голосовое сообщение";
+            }
+            return "Файл";
         }
 
         return "Сообщение";

@@ -167,7 +167,8 @@ class Config:
     ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
     ALLOWED_FILE_EXTENSIONS = {
         "txt", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "rar",
-        "7z", "csv", "mp3", "mp4", "avi", "mov", "mkv", "json", "xml", "apk",
+        "7z", "csv", "mp3", "wav", "ogg", "opus", "m4a", "aac", "flac",
+        "webm", "mp4", "avi", "mov", "mkv", "json", "xml", "apk",
     }
 
     UPLOAD_BASE_FOLDER = BASE_DIR / "app" / "static" / "uploads"

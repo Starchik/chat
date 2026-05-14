@@ -365,7 +365,13 @@ function setChatHeader(chat) {
             if (first?.kind === "video") {
                 return "Видео";
             }
-            if (first?.kind === "audio") {
+            const mime = String(first?.mime_type || "").toLowerCase();
+            const fileName = String(first?.file_name || "").toLowerCase();
+            if (
+                first?.kind === "audio"
+                || mime.startsWith("audio/")
+                || (fileName.startsWith("voice-") && fileName.endsWith(".webm"))
+            ) {
                 return "Аудио";
             }
             return "Файл";
@@ -486,9 +492,6 @@ function bindBaseEvents(app) {
 
     refs.mobileOpenSidebar.addEventListener("click", () => setSidebarOpen(true));
     refs.mobileCloseSidebar.addEventListener("click", () => setSidebarOpen(false));
-    refs.voiceBtn?.addEventListener("click", () => {
-        showToast("Запись голосовых скоро появится");
-    });
 
     refs.menuActionBtn?.addEventListener("click", (event) => {
         event.stopPropagation();

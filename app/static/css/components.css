@@ -226,6 +226,18 @@ select:focus-visible {
     cursor: not-allowed;
 }
 
+#voice-btn.is-recording {
+    color: #fff;
+    border-color: rgba(255, 139, 162, 0.84);
+    background: linear-gradient(135deg, rgba(247, 86, 122, 0.96), rgba(232, 74, 100, 0.92));
+    box-shadow: 0 12px 28px rgba(247, 86, 122, 0.36);
+}
+
+#voice-btn.is-recording:hover {
+    border-color: rgba(255, 168, 184, 0.92);
+    box-shadow: 0 16px 34px rgba(247, 86, 122, 0.42);
+}
+
 .send-btn {
     width: 46px;
     height: 46px;

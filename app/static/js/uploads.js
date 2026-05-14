@@ -10,6 +10,17 @@
     let previewExpanded = false;
     const uploadProgressByKey = new Map();
     const MOBILE_COLLAPSE_LIMIT = 3;
+    const VOICE_MIME_CANDIDATES = [
+        "audio/webm;codecs=opus",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+        "audio/webm",
+        "audio/ogg",
+    ];
+    let mediaRecorder = null;
+    let recordingStream = null;
+    let recordingChunks = [];
+    let isRecordingVoice = false;
 
     function isCompactViewport() {
         return window.matchMedia("(max-width: 720px)").matches;
@@ -140,8 +151,12 @@
                 chip.classList.add("upload-chip--error");
             }
 
-            const isImage = file.type.startsWith("image/");
-            const iconClass = isImage ? "fa-regular fa-image" : "fa-regular fa-file";
+            const mime = String(file.type || "").toLowerCase();
+            const isImage = mime.startsWith("image/");
+            const isAudio = mime.startsWith("audio/");
+            const iconClass = isImage
+                ? "fa-regular fa-image"
+                : (isAudio ? "fa-solid fa-music" : "fa-regular fa-file");
             const showProgress = isUploading || isDone || hasError || percent > 0;
 
             let statusText = "";
@@ -322,6 +337,149 @@
         });
     }
 
+    function updateVoiceButtonUi() {
+        if (!refs.voiceBtn) {
+            return;
+        }
+
+        refs.voiceBtn.classList.toggle("is-recording", isRecordingVoice);
+        refs.voiceBtn.setAttribute(
+            "aria-label",
+            isRecordingVoice ? "Остановить запись" : "Голосовое сообщение",
+        );
+
+        const icon = refs.voiceBtn.querySelector("i");
+        if (icon) {
+            icon.className = isRecordingVoice ? "fa-solid fa-stop" : "fa-solid fa-microphone";
+        }
+    }
+
+    function pickVoiceMimeType() {
+        if (typeof window.MediaRecorder === "undefined") {
+            return "";
+        }
+
+        if (typeof window.MediaRecorder.isTypeSupported !== "function") {
+            return "audio/webm";
+        }
+
+        for (const candidate of VOICE_MIME_CANDIDATES) {
+            if (window.MediaRecorder.isTypeSupported(candidate)) {
+                return candidate;
+            }
+        }
+
+        return "audio/webm";
+    }
+
+    function extensionForMimeType(mimeType) {
+        const normalized = String(mimeType || "").toLowerCase();
+        if (normalized.includes("ogg")) {
+            return "ogg";
+        }
+        if (normalized.includes("mp4")) {
+            return "m4a";
+        }
+        if (normalized.includes("wav")) {
+            return "wav";
+        }
+        return "webm";
+    }
+
+    function cleanupVoiceRecorder() {
+        if (recordingStream) {
+            recordingStream.getTracks().forEach((track) => track.stop());
+            recordingStream = null;
+        }
+
+        mediaRecorder = null;
+        recordingChunks = [];
+        isRecordingVoice = false;
+        updateVoiceButtonUi();
+    }
+
+    async function startVoiceRecording() {
+        if (uploadLocked) {
+            return;
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") {
+            helpers.showToast("Запись голосовых не поддерживается в этом браузере");
+            return;
+        }
+
+        try {
+            const mimeType = pickVoiceMimeType();
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = mimeType
+                ? new window.MediaRecorder(stream, { mimeType })
+                : new window.MediaRecorder(stream);
+
+            recordingStream = stream;
+            mediaRecorder = recorder;
+            recordingChunks = [];
+            isRecordingVoice = true;
+            updateVoiceButtonUi();
+            helpers.showToast("Идет запись голосового...");
+
+            recorder.addEventListener("dataavailable", (event) => {
+                if (event.data && event.data.size > 0) {
+                    recordingChunks.push(event.data);
+                }
+            });
+
+            recorder.addEventListener("stop", () => {
+                const finalMime = String(recorder.mimeType || mimeType || "audio/webm");
+                const blob = new Blob(recordingChunks, { type: finalMime });
+
+                if (blob.size > 0) {
+                    const extension = extensionForMimeType(finalMime);
+                    const now = new Date();
+                    const hh = String(now.getHours()).padStart(2, "0");
+                    const mm = String(now.getMinutes()).padStart(2, "0");
+                    const ss = String(now.getSeconds()).padStart(2, "0");
+                    const fileName = `voice-${hh}${mm}${ss}.${extension}`;
+                    const voiceFile = new File([blob], fileName, {
+                        type: finalMime,
+                        lastModified: Date.now(),
+                    });
+                    addFiles([voiceFile]);
+                    helpers.showToast("Голосовое добавлено");
+                } else {
+                    helpers.showToast("Запись пустая, попробуйте еще раз");
+                }
+
+                cleanupVoiceRecorder();
+            });
+
+            recorder.addEventListener("error", () => {
+                helpers.showToast("Ошибка записи голосового");
+                cleanupVoiceRecorder();
+            });
+
+            recorder.start(200);
+        } catch (_error) {
+            helpers.showToast("Не удалось получить доступ к микрофону");
+            cleanupVoiceRecorder();
+        }
+    }
+
+    function stopVoiceRecording() {
+        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+            cleanupVoiceRecorder();
+            return;
+        }
+        mediaRecorder.stop();
+    }
+
+    function toggleVoiceRecording() {
+        if (isRecordingVoice) {
+            stopVoiceRecording();
+            return;
+        }
+        void startVoiceRecording();
+    }
+
     function bindDnD() {
         const host = refs.composer;
 
@@ -371,6 +529,19 @@
 
         bindDnD();
         bindPaste();
+        updateVoiceButtonUi();
+
+        refs.voiceBtn?.addEventListener("click", () => {
+            toggleVoiceRecording();
+        });
+
+        window.addEventListener("beforeunload", () => {
+            if (isRecordingVoice) {
+                stopVoiceRecording();
+            } else {
+                cleanupVoiceRecorder();
+            }
+        });
 
         window.addEventListener("resize", () => {
             if (!isCompactViewport()) {

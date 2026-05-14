@@ -207,11 +207,7 @@
     }
 
     .composer__row {
-        grid-template-columns: auto auto minmax(0, 1fr) auto;
-    }
-
-    #voice-btn {
-        display: none;
+        grid-template-columns: auto auto minmax(0, 1fr) auto auto;
     }
 
     .emoji-panel {

@@ -211,7 +211,16 @@
         }
 
         if (message.reply_to?.attachments?.length) {
-            return message.reply_to.attachments[0].kind === "image" ? "Фото" : "Файл";
+            const first = message.reply_to.attachments[0];
+            if (first.kind === "image") {
+                return "Фото";
+            }
+            const mime = String(first.mime_type || "").toLowerCase();
+            const fileName = String(first.file_name || "").toLowerCase();
+            if (mime.startsWith("audio/") || (fileName.startsWith("voice-") && fileName.endsWith(".webm"))) {
+                return "Аудио";
+            }
+            return "Файл";
         }
 
         const cached = findMessageById(message.chat_id, message.reply_to_id);
@@ -224,7 +233,16 @@
         }
 
         if (cached.attachments?.length) {
-            return cached.attachments[0].kind === "image" ? "Фото" : "Файл";
+            const first = cached.attachments[0];
+            if (first.kind === "image") {
+                return "Фото";
+            }
+            const mime = String(first.mime_type || "").toLowerCase();
+            const fileName = String(first.file_name || "").toLowerCase();
+            if (mime.startsWith("audio/") || (fileName.startsWith("voice-") && fileName.endsWith(".webm"))) {
+                return "Аудио";
+            }
+            return "Файл";
         }
 
         return "Сообщение";
@@ -324,16 +342,11 @@
 
         if (mediaKind === "audio") {
             return `
-                <div class="message__file">
-                    <a
-                        class="message__file-doc message__file-doc--preview"
-                        href="${fileUrl}"
-                        data-previewable="1"
-                        data-kind="audio"
-                        data-url="${fileUrl}"
-                        data-name="${fileName}"
-                        data-mime="${mime}"
-                    >
+                <div class="message__file message__file--audio">
+                    <audio class="message__audio" controls preload="metadata">
+                        <source src="${fileUrl}" type="${mime}" />
+                    </audio>
+                    <a class="message__audio-download" href="${fileUrl}" target="_blank" rel="noopener noreferrer">
                         <i class="fa-solid fa-music"></i>
                         <span>${fileName}</span>
                     </a>
@@ -366,12 +379,24 @@
             ? fileName.split(".").pop()
             : "";
 
-        if (mime.startsWith("video/") || ["mp4", "webm", "mov", "mkv", "avi", "m4v"].includes(extension)) {
+        if (mime.startsWith("audio/")) {
+            return "audio";
+        }
+
+        if (mime.startsWith("video/")) {
             return "video";
         }
 
-        if (mime.startsWith("audio/") || ["mp3", "wav", "ogg", "m4a", "aac", "flac", "opus"].includes(extension)) {
+        if (extension === "webm") {
+            return fileName.startsWith("voice-") ? "audio" : "video";
+        }
+
+        if (["mp3", "wav", "ogg", "m4a", "aac", "flac", "opus"].includes(extension)) {
             return "audio";
+        }
+
+        if (["mp4", "mov", "mkv", "avi", "m4v"].includes(extension)) {
+            return "video";
         }
 
         return "file";
@@ -1465,6 +1490,11 @@
         const imageCount = attachments.filter((item) => item?.kind === "image").length;
         if (imageCount > 0 && imageCount === attachments.length) {
             return imageCount > 1 ? `Фото (${imageCount})` : "Фото";
+        }
+
+        const audioCount = attachments.filter((item) => String(item?.mime_type || "").toLowerCase().startsWith("audio/")).length;
+        if (audioCount > 0 && audioCount === attachments.length) {
+            return audioCount > 1 ? `Аудио (${audioCount})` : "Аудио";
         }
 
         const first = attachments[0];
