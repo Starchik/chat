@@ -1,4 +1,5 @@
 import os
+import sys
 
 
 def _normalize_async_mode(value: str) -> str:
@@ -9,11 +10,27 @@ def _normalize_async_mode(value: str) -> str:
     return "threading"
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def _prepare_async_mode() -> None:
     requested_mode = _normalize_async_mode(os.getenv("SOCKETIO_ASYNC_MODE", "threading"))
+    force_eventlet = _env_bool("SOCKETIO_FORCE_EVENTLET", False)
 
     if requested_mode != "eventlet":
         os.environ["SOCKETIO_ASYNC_MODE"] = requested_mode
+        return
+
+    if sys.version_info >= (3, 12) and not force_eventlet:
+        os.environ["SOCKETIO_ASYNC_MODE"] = "threading"
+        print(
+            "[startup] Python 3.12+ detected, using threading. "
+            "Set SOCKETIO_FORCE_EVENTLET=1 to force eventlet."
+        )
         return
 
     try:

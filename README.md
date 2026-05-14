@@ -28,6 +28,7 @@ cp .env.example .env
    - `SECRET_KEY=...` (32+ символа)
    - `JWT_SECRET_KEY=...` (32+ символа)
    - `WEBRTC_TURN_CREDENTIAL=...` (сильный пароль)
+   - `SOCKETIO_ASYNC_MODE=threading`
 4. Откройте порты на сервере/фаерволе:
    - `80/tcp`
    - `443/tcp`
@@ -116,6 +117,24 @@ docker compose logs -f messenger
 docker compose logs -f caddy
 docker compose logs -f coturn
 docker compose restart
+```
+
+## Если `/health` даёт `Connection reset by peer`
+
+1. Убедитесь, что в `.env`:
+
+```env
+SOCKETIO_ASYNC_MODE=threading
+SOCKETIO_FORCE_EVENTLET=0
+```
+
+2. Пересоберите `messenger`:
+
+```bash
+docker compose down
+docker compose up -d --build --force-recreate messenger
+docker compose logs --tail=120 messenger
+curl -v http://127.0.0.1:5000/health
 ```
 
 ## Cloudflared (Tunnel)
