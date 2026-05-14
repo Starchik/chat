@@ -158,6 +158,10 @@
         height: 41px;
     }
 
+    .call-expand-fab {
+        bottom: 4.95rem;
+    }
+
     .toast-stack {
         left: 0.72rem;
         right: 0.72rem;
@@ -253,7 +257,7 @@
 
     .call-expand-fab {
         right: 0.68rem;
-        bottom: 4.4rem;
+        bottom: 4.65rem;
         width: 46px;
         height: 46px;
     }
