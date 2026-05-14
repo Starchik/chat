@@ -130,6 +130,7 @@ function showToast(message, timeout = 2800) {
 
 function showModal(html, onReady) {
     refs.modal.classList.remove("modal--media-preview");
+    refs.modalOverlay.classList.remove("modal-overlay--media-preview");
     refs.modal.innerHTML = html;
     refs.modalOverlay.classList.remove("hidden");
     if (typeof onReady === "function") {
@@ -139,6 +140,7 @@ function showModal(html, onReady) {
 
 function hideModal() {
     refs.modalOverlay.classList.add("hidden");
+    refs.modalOverlay.classList.remove("modal-overlay--media-preview");
     refs.modal.classList.remove("modal--media-preview");
     refs.modal.innerHTML = "";
 }

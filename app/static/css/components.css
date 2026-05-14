@@ -376,6 +376,13 @@ select:focus-visible {
     padding: 1rem;
 }
 
+.modal-overlay.modal-overlay--media-preview {
+    padding: 0;
+    place-items: stretch;
+    background: rgba(6, 11, 20, 0.92);
+    backdrop-filter: blur(12px);
+}
+
 .modal {
     width: min(560px, 100%);
     max-height: min(84vh, 740px);
@@ -389,10 +396,15 @@ select:focus-visible {
 }
 
 .modal.modal--media-preview {
-    width: min(94vw, 1320px);
-    max-height: 92vh;
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    background: rgba(8, 14, 26, 0.9);
     overflow: hidden;
-    padding: 0.92rem;
+    padding: 0;
 }
 
 .modal h3 {

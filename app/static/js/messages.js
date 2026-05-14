@@ -339,6 +339,7 @@
         `, () => {
             const closeButton = document.getElementById("media-preview-close");
             refs.modal.classList.add("modal--media-preview");
+            refs.modalOverlay?.classList.add("modal-overlay--media-preview");
             closeButton?.addEventListener("click", helpers.hideModal);
 
             if (!isZoomable) {
