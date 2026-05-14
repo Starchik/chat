@@ -1,4 +1,5 @@
-﻿const CACHE_NAME = "messenger-static-v23";
+const SW_VERSION = new URL(self.location.href).searchParams.get("v") || "v1";
+const CACHE_NAME = `messenger-static-${SW_VERSION}`;
 const OFFLINE_URLS = [
     "/",
     "/login",
@@ -116,6 +117,7 @@ self.addEventListener("notificationclick", (event) => {
         await clients.openWindow(targetUrl);
     })());
 });
+
 
 
 
