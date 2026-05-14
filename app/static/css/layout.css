@@ -153,17 +153,27 @@
     padding: 1rem;
     display: flex;
     flex-direction: column;
+    isolation: isolate;
 }
 
 .messages-scroll__overlay {
-    content: "";
-    position: absolute;
-    inset: 0;
+    position: sticky;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 100%;
+    margin-bottom: -100%;
+    z-index: 0;
     pointer-events: none;
     background:
         radial-gradient(540px 300px at 12% 8%, rgba(72, 173, 255, 0.1), transparent 74%),
         radial-gradient(550px 320px at 88% 4%, rgba(118, 120, 255, 0.1), transparent 72%),
         radial-gradient(650px 360px at 50% 100%, rgba(72, 255, 204, 0.06), transparent 74%);
+}
+
+.messages-scroll > *:not(.messages-scroll__overlay) {
+    position: relative;
+    z-index: 1;
 }
 
 .messages-loader {
