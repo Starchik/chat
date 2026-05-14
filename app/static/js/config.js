@@ -1,10 +1,10 @@
 ﻿window.APP_CONFIG = {
     apiBase: "/api",
     socketPath: "/socket.io",
-    cacheVersion: "v16",
+    cacheVersion: "v17",
     messagePageSize: 30,
     maxCachedMessages: 500,
-    maxUploadFiles: 10,
+    maxUploadFiles: 100,
     uploadChunkSize: Math.max(64 * 1024, Number(window.APP_RUNTIME?.upload_chunk_size) || (1024 * 1024)),
     webrtcIceServers: Array.isArray(window.APP_RUNTIME?.webrtc_ice_servers)
         ? window.APP_RUNTIME.webrtc_ice_servers

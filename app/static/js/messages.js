@@ -14,6 +14,7 @@
     let glowMessageElement = null;
     let autoScrollEnabled = true;
     const lastReadByChat = new Map();
+    const MAX_IMAGE_ATTACHMENT_GROUP_SIZE = 10;
 
     function getCurrentChat() {
         return deps.chats?.getChatById(state.currentChatId) || null;
@@ -356,19 +357,77 @@
         return "file";
     }
 
-    function openAttachmentPreview({ kind, url, name, mimeType = "" }) {
+    function splitAttachmentBlocks(attachments = []) {
+        const blocks = [];
+        let imageBuffer = [];
+
+        const flushImageBuffer = () => {
+            while (imageBuffer.length > 0) {
+                blocks.push({
+                    type: "image-group",
+                    attachments: imageBuffer.slice(0, MAX_IMAGE_ATTACHMENT_GROUP_SIZE),
+                });
+                imageBuffer = imageBuffer.slice(MAX_IMAGE_ATTACHMENT_GROUP_SIZE);
+            }
+        };
+
+        attachments.forEach((attachment) => {
+            const mediaKind = detectAttachmentKind(attachment);
+            if (mediaKind === "image") {
+                imageBuffer.push(attachment);
+                return;
+            }
+
+            flushImageBuffer();
+            blocks.push({
+                type: "single",
+                attachment,
+            });
+        });
+
+        flushImageBuffer();
+        return blocks;
+    }
+
+    function openAttachmentPreview({
+        kind,
+        url,
+        name,
+        mimeType = "",
+        galleryItems = null,
+        galleryIndex = 0,
+    }) {
         if (!url || !kind || kind === "file") {
             return;
         }
 
-        const safeName = helpers.escapeHtml(name || "Файл");
-        const safeUrl = helpers.escapeHtml(url);
-        const safeMime = helpers.escapeHtml(mimeType);
         const isZoomable = kind === "image";
+        const normalizedGallery = isZoomable && Array.isArray(galleryItems) && galleryItems.length
+            ? galleryItems
+                .filter((item) => item && item.url)
+                .map((item) => ({
+                    url: String(item.url),
+                    name: String(item.name || "Файл"),
+                    mimeType: String(item.mimeType || ""),
+                }))
+            : [{
+                url: String(url),
+                name: String(name || "Файл"),
+                mimeType: String(mimeType || ""),
+            }];
+        const hasGalleryNavigation = isZoomable && normalizedGallery.length > 1;
+        let currentGalleryIndex = hasGalleryNavigation
+            ? Math.min(Math.max(Number(galleryIndex) || 0, 0), normalizedGallery.length - 1)
+            : 0;
+
+        const currentItem = () => normalizedGallery[currentGalleryIndex] || normalizedGallery[0];
+        const safeName = helpers.escapeHtml(currentItem().name || "Файл");
+        const safeUrl = helpers.escapeHtml(currentItem().url);
+        const safeMime = helpers.escapeHtml(currentItem().mimeType || mimeType || "");
 
         let content = "";
         if (kind === "image") {
-            content = `<img class="media-preview__image media-preview__zoom-target" src="${safeUrl}" alt="${safeName}" />`;
+            content = `<img id="media-preview-image" class="media-preview__image media-preview__zoom-target" src="${safeUrl}" alt="${safeName}" />`;
         } else if (kind === "video") {
             content = `
                 <video class="media-preview__video" controls autoplay playsinline preload="metadata">
@@ -391,24 +450,37 @@
                 <button id="media-preview-close" class="icon-btn media-preview__close" type="button" aria-label="Закрыть">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
+                ${hasGalleryNavigation ? `
+                    <button id="media-preview-prev" class="icon-btn media-preview__nav media-preview__nav--prev" type="button" aria-label="Предыдущее фото">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button id="media-preview-next" class="icon-btn media-preview__nav media-preview__nav--next" type="button" aria-label="Следующее фото">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    <div id="media-preview-counter" class="media-preview__counter">${currentGalleryIndex + 1} / ${normalizedGallery.length}</div>
+                ` : ""}
                 <div class="media-preview__body${isZoomable ? " media-preview__body--zoomable" : ""}">
                     ${content}
                 </div>
             </div>
         `, () => {
             const closeButton = document.getElementById("media-preview-close");
+            const prevButton = document.getElementById("media-preview-prev");
+            const nextButton = document.getElementById("media-preview-next");
+            const counter = document.getElementById("media-preview-counter");
             refs.modal.classList.add("modal--media-preview");
             refs.modalOverlay?.classList.add("modal-overlay--media-preview");
-            closeButton?.addEventListener("click", helpers.hideModal);
 
             if (!isZoomable) {
+                closeButton?.addEventListener("click", helpers.hideModal);
                 return;
             }
 
-            const zoomTarget = document.querySelector(".media-preview__zoom-target");
+            const zoomTarget = document.getElementById("media-preview-image");
             const zoomBody = document.querySelector(".media-preview__body");
 
             if (!zoomTarget || !zoomBody) {
+                closeButton?.addEventListener("click", helpers.hideModal);
                 return;
             }
 
@@ -427,6 +499,8 @@
             let dragStartY = 0;
             let dragStartScrollLeft = 0;
             let dragStartScrollTop = 0;
+            let swipeStartX = null;
+            let swipeStartY = null;
 
             const isPannable = () => {
                 if (!isImageTarget || scale <= minScale + 0.001) {
@@ -500,6 +574,12 @@
                 updatePanState();
             };
 
+            const resetZoom = () => {
+                scale = 1;
+                baseWidth = 0;
+                applyZoom();
+            };
+
             const changeScale = (nextScale, focusClientX = null, focusClientY = null) => {
                 const previousScale = scale;
                 const targetScale = Math.min(maxScale, Math.max(minScale, nextScale));
@@ -521,6 +601,65 @@
                     zoomBody.scrollTop = contentFocusY * scaleRatio - focusPoint.y;
                 });
             };
+
+            const setGalleryIndex = (nextIndex) => {
+                if (!hasGalleryNavigation || !normalizedGallery.length) {
+                    return;
+                }
+
+                const total = normalizedGallery.length;
+                currentGalleryIndex = ((Number(nextIndex) % total) + total) % total;
+                const nextItem = currentItem();
+                zoomTarget.src = nextItem.url;
+                zoomTarget.alt = nextItem.name || "Файл";
+
+                if (counter) {
+                    counter.textContent = `${currentGalleryIndex + 1} / ${normalizedGallery.length}`;
+                }
+
+                resetZoom();
+            };
+
+            const showNext = () => setGalleryIndex(currentGalleryIndex + 1);
+            const showPrev = () => setGalleryIndex(currentGalleryIndex - 1);
+
+            let keydownHandler = null;
+            const closePreview = () => {
+                if (keydownHandler) {
+                    document.removeEventListener("keydown", keydownHandler);
+                    keydownHandler = null;
+                }
+                helpers.hideModal();
+            };
+
+            closeButton?.addEventListener("click", closePreview);
+
+            if (hasGalleryNavigation) {
+                prevButton?.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    showPrev();
+                });
+                nextButton?.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    showNext();
+                });
+
+                keydownHandler = (event) => {
+                    if (refs.modalOverlay.classList.contains("hidden") || !refs.modal.classList.contains("modal--media-preview")) {
+                        document.removeEventListener("keydown", keydownHandler);
+                        keydownHandler = null;
+                        return;
+                    }
+                    if (event.key === "ArrowLeft") {
+                        event.preventDefault();
+                        showPrev();
+                    } else if (event.key === "ArrowRight") {
+                        event.preventDefault();
+                        showNext();
+                    }
+                };
+                document.addEventListener("keydown", keydownHandler);
+            }
 
             zoomBody.addEventListener("wheel", (event) => {
                 event.preventDefault();
@@ -560,6 +699,10 @@
                 };
 
                 zoomBody.addEventListener("touchstart", (event) => {
+                    if (hasGalleryNavigation && event.touches.length === 1 && scale <= minScale + 0.001) {
+                        swipeStartX = event.touches[0].clientX;
+                        swipeStartY = event.touches[0].clientY;
+                    }
                     if (event.touches.length === 2) {
                         beginPinch(event);
                         event.preventDefault();
@@ -582,6 +725,20 @@
                 }, { passive: false });
 
                 zoomBody.addEventListener("touchend", (event) => {
+                    if (hasGalleryNavigation && swipeStartX !== null && swipeStartY !== null && event.changedTouches.length === 1 && scale <= minScale + 0.001) {
+                        const touch = event.changedTouches[0];
+                        const deltaX = touch.clientX - swipeStartX;
+                        const deltaY = touch.clientY - swipeStartY;
+                        if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.15) {
+                            if (deltaX < 0) {
+                                showNext();
+                            } else {
+                                showPrev();
+                            }
+                        }
+                    }
+                    swipeStartX = null;
+                    swipeStartY = null;
                     if (event.touches.length >= 2) {
                         return;
                     }
@@ -589,6 +746,8 @@
                 });
 
                 zoomBody.addEventListener("touchcancel", () => {
+                    swipeStartX = null;
+                    swipeStartY = null;
                     pinchStartDistance = 0;
                 });
 
@@ -654,13 +813,11 @@
                 zoomBody.addEventListener("lostpointercapture", stopDragging);
             }
 
-            if (zoomTarget.tagName === "IMG") {
-                zoomTarget.addEventListener("load", () => {
-                    baseWidth = 0;
-                    setBaseWidth();
-                    applyZoom();
-                }, { once: true });
-            }
+            zoomTarget.addEventListener("load", () => {
+                baseWidth = 0;
+                setBaseWidth();
+                applyZoom();
+            });
 
             setBaseWidth();
             updatePanState();
@@ -856,7 +1013,22 @@
         if (!isDeleted && message.attachments?.length) {
             const files = document.createElement("div");
             files.className = "message__files";
-            files.innerHTML = message.attachments.map(renderAttachment).join("");
+
+            const blocks = splitAttachmentBlocks(message.attachments);
+            blocks.forEach((block) => {
+                if (block.type === "image-group") {
+                    const gallery = document.createElement("div");
+                    gallery.className = "message__gallery";
+                    gallery.dataset.previewGallery = "1";
+                    gallery.innerHTML = block.attachments.map(renderAttachment).join("");
+                    files.appendChild(gallery);
+                    return;
+                }
+
+                if (block.attachment) {
+                    files.insertAdjacentHTML("beforeend", renderAttachment(block.attachment));
+                }
+            });
             bubble.appendChild(files);
         }
 
@@ -1751,12 +1923,33 @@
 
             event.preventDefault();
 
-            openAttachmentPreview({
-                kind: previewTarget.dataset.kind,
+            const kind = previewTarget.dataset.kind;
+            const openPayload = {
+                kind,
                 url: previewTarget.dataset.url,
                 name: previewTarget.dataset.name,
                 mimeType: previewTarget.dataset.mime,
-            });
+            };
+
+            if (kind === "image") {
+                const galleryRoot = previewTarget.closest("[data-preview-gallery='1']");
+                if (galleryRoot) {
+                    const galleryNodes = Array.from(galleryRoot.querySelectorAll("[data-previewable='1'][data-kind='image']"));
+                    const galleryItems = galleryNodes.map((node) => ({
+                        url: node.dataset.url,
+                        name: node.dataset.name,
+                        mimeType: node.dataset.mime,
+                    })).filter((item) => item.url);
+                    const galleryIndex = galleryNodes.indexOf(previewTarget);
+
+                    if (galleryItems.length > 0) {
+                        openPayload.galleryItems = galleryItems;
+                        openPayload.galleryIndex = galleryIndex >= 0 ? galleryIndex : 0;
+                    }
+                }
+            }
+
+            openAttachmentPreview(openPayload);
         });
 
         refs.pinnedWrapper.addEventListener("pointerdown", () => {
