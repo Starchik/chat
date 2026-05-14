@@ -485,7 +485,12 @@ function bindBaseEvents(app) {
         if (!app.modules?.messages?.openSearchModal) {
             return;
         }
-        app.modules.messages.openSearchModal();
+        try {
+            app.modules.messages.openSearchModal();
+        } catch (error) {
+            console.error("Failed to open message search modal", error);
+            showToast("Не удалось открыть поиск сообщений");
+        }
     });
 
     refs.modalOverlay.addEventListener("click", (event) => {

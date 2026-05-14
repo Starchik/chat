@@ -1426,16 +1426,17 @@
     }
 
     function openSearchModal() {
-        const chatId = Number(state.currentChatId);
-        if (!chatId) {
-            helpers.showToast("Сначала выберите чат");
-            return;
-        }
+        try {
+            const chatId = Number(state.currentChatId);
+            if (!chatId) {
+                helpers.showToast("Сначала выберите чат");
+                return;
+            }
 
-        const currentChat = getCurrentChat();
-        const chatTitle = helpers.escapeHtml(currentChat?.title || "Текущий чат");
+            const currentChat = getCurrentChat();
+            const chatTitle = helpers.escapeHtml(currentChat?.title || "Текущий чат");
 
-        helpers.showModal(`
+            helpers.showModal(`
             <h3>Поиск сообщений</h3>
             <div class="message-search-modal">
                 <div class="message-search-modal__chat">${chatTitle}</div>
@@ -1574,6 +1575,10 @@
 
             input.focus();
         });
+        } catch (error) {
+            console.error("openSearchModal error", error);
+            helpers.showToast("Не удалось открыть поиск сообщений");
+        }
     }
 
     async function sendMessage() {

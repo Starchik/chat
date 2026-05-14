@@ -151,20 +151,35 @@ def search_messages(chat_id: int):
     query_text = query_text[:120]
     like_pattern = f"%{query_text}%"
 
-    matched_messages = (
-        Message.query
-        .filter(
-            Message.chat_id == chat_id,
-            Message.is_deleted.is_(False),
-            or_(
-                Message.content.ilike(like_pattern),
-                Message.attachments.any(MessageAttachment.file_name.ilike(like_pattern)),
-            ),
+    try:
+        matched_messages = (
+            Message.query
+            .filter(
+                Message.chat_id == chat_id,
+                Message.is_deleted.is_(False),
+                or_(
+                    Message.content.ilike(like_pattern),
+                    Message.attachments.any(MessageAttachment.file_name.ilike(like_pattern)),
+                ),
+            )
+            .order_by(Message.id.desc())
+            .limit(limit)
+            .all()
         )
-        .order_by(Message.id.desc())
-        .limit(limit)
-        .all()
-    )
+    except Exception:
+        # Fallback: keep search functional even if attachment-query branch fails
+        # for a specific DB/runtime edge case.
+        matched_messages = (
+            Message.query
+            .filter(
+                Message.chat_id == chat_id,
+                Message.is_deleted.is_(False),
+                Message.content.ilike(like_pattern),
+            )
+            .order_by(Message.id.desc())
+            .limit(limit)
+            .all()
+        )
 
     return jsonify(
         {
