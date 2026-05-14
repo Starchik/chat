@@ -12,6 +12,7 @@
     let pinnedHoldTimer = null;
     let pinnedHoldTriggered = false;
     let glowMessageElement = null;
+    let autoScrollEnabled = true;
     const lastReadByChat = new Map();
 
     function getCurrentChat() {
@@ -69,15 +70,19 @@
     }
 
     function scrollToBottom(smooth = false) {
+        autoScrollEnabled = true;
         refs.messagesScroll.scrollTo({
             top: refs.messagesScroll.scrollHeight,
             behavior: smooth ? "smooth" : "auto",
         });
     }
 
-    function isNearBottom() {
-        const threshold = 120;
-        return refs.messagesScroll.scrollHeight - refs.messagesScroll.scrollTop - refs.messagesScroll.clientHeight < threshold;
+    function isNearBottom(threshold = 24) {
+        return refs.messagesScroll.scrollHeight - refs.messagesScroll.scrollTop - refs.messagesScroll.clientHeight <= threshold;
+    }
+
+    function updateAutoScrollState() {
+        autoScrollEnabled = isNearBottom();
     }
 
     function isChatVisibleForRead() {
@@ -1242,7 +1247,7 @@
         deps.chats.touchChatFromMessage(message);
 
         if (state.currentChatId === message.chat_id) {
-            const shouldScroll = isNearBottom() || message.sender_id === state.me.id;
+            const shouldScroll = autoScrollEnabled || message.sender_id === state.me.id;
             renderMessages(message.chat_id);
 
             if (shouldScroll) {
@@ -1571,6 +1576,7 @@
         refs.messageInput.addEventListener("keydown", handleKeyboardShortcuts);
 
         refs.messagesScroll.addEventListener("scroll", () => {
+            updateAutoScrollState();
             void handleScrollTopLoad();
         });
 
@@ -1633,6 +1639,7 @@
         bindContextMenuActions();
         bindEmojiPanel();
         autoResizeInput();
+        updateAutoScrollState();
         ensureNotificationPermissionOnInteraction();
     }
 

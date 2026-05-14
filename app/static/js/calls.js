@@ -46,6 +46,25 @@ export function initCallsModule(app) {
         insecure_context: "\u0414\u043b\u044f \u0437\u0432\u043e\u043d\u043a\u043e\u0432 \u043d\u0443\u0436\u0435\u043d HTTPS (\u0438\u043b\u0438 localhost)",
     };
 
+    const ringtonePatterns = {
+        incoming: [
+            { frequency: 659.25, duration: 0.16 },
+            { frequency: 987.77, duration: 0.14 },
+            { frequency: 1318.51, duration: 0.2 },
+            { frequency: null, duration: 0.22 },
+            { frequency: 880.0, duration: 0.14 },
+            { frequency: 1318.51, duration: 0.16 },
+            { frequency: 1760.0, duration: 0.24 },
+            { frequency: null, duration: 0.74 },
+        ],
+        outgoing: [
+            { frequency: 392.0, duration: 0.12 },
+            { frequency: null, duration: 0.1 },
+            { frequency: 523.25, duration: 0.14 },
+            { frequency: null, duration: 0.54 },
+        ],
+    };
+
     let currentCall = null;
     let peerConnection = null;
     let localStream = null;
@@ -55,6 +74,9 @@ export function initCallsModule(app) {
     let callStartedAt = null;
     let elapsedTimerId = null;
     let isMinimized = false;
+    let ringtoneContext = null;
+    let ringtoneMasterGain = null;
+    let ringtoneLoopTimerId = null;
 
     function getPeerConnectionCtor() {
         return window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || null;
@@ -128,6 +150,92 @@ export function initCallsModule(app) {
         }
     }
 
+    function ensureRingtoneContext() {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) {
+            return null;
+        }
+
+        if (!ringtoneContext) {
+            ringtoneContext = new AudioCtx();
+        }
+
+        if (!ringtoneMasterGain) {
+            ringtoneMasterGain = ringtoneContext.createGain();
+            ringtoneMasterGain.gain.value = 0.12;
+            ringtoneMasterGain.connect(ringtoneContext.destination);
+        }
+
+        if (ringtoneContext.state === "suspended") {
+            ringtoneContext.resume().catch(() => {});
+        }
+
+        return ringtoneContext;
+    }
+
+    function scheduleRingtoneTone(context, startAt, note, volume = 0.24) {
+        if (!note?.frequency || note.duration <= 0) {
+            return;
+        }
+
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(note.frequency, startAt);
+
+        const attackEnd = startAt + Math.min(0.02, note.duration * 0.25);
+        const releaseStart = startAt + Math.max(0.03, note.duration - 0.03);
+        const stopAt = startAt + note.duration;
+
+        gainNode.gain.setValueAtTime(0.0001, startAt);
+        gainNode.gain.linearRampToValueAtTime(volume, attackEnd);
+        gainNode.gain.exponentialRampToValueAtTime(0.06, releaseStart);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(ringtoneMasterGain);
+
+        oscillator.start(startAt);
+        oscillator.stop(stopAt + 0.02);
+    }
+
+    function playRingtonePattern(pattern) {
+        const context = ensureRingtoneContext();
+        if (!context || !ringtoneMasterGain || !Array.isArray(pattern) || !pattern.length) {
+            return;
+        }
+
+        const startAt = context.currentTime + 0.02;
+        let cursor = startAt;
+
+        pattern.forEach((note) => {
+            scheduleRingtoneTone(context, cursor, note);
+            cursor += Number(note.duration) || 0;
+        });
+
+        const loopDurationMs = Math.max(300, Math.round((cursor - startAt) * 1000));
+        ringtoneLoopTimerId = window.setTimeout(() => {
+            if (!currentCall || currentCall.phase !== "ringing") {
+                return;
+            }
+            playRingtonePattern(pattern);
+        }, loopDurationMs);
+    }
+
+    function startRingtone(direction = "incoming") {
+        stopRingtone();
+        const pattern = ringtonePatterns[direction] || ringtonePatterns.incoming;
+        playRingtonePattern(pattern);
+    }
+
+    function stopRingtone() {
+        if (ringtoneLoopTimerId) {
+            window.clearTimeout(ringtoneLoopTimerId);
+            ringtoneLoopTimerId = null;
+        }
+    }
+
     function stopStream(stream) {
         if (!stream) {
             return;
@@ -161,6 +269,7 @@ export function initCallsModule(app) {
 
     function resetCallState() {
         clearTimers();
+        stopRingtone();
         closePeerConnection();
         stopStream(localStream);
         stopStream(remoteStream);
@@ -591,6 +700,7 @@ export function initCallsModule(app) {
 
             currentCall.phase = "ringing";
             renderCallUi();
+            startRingtone("outgoing");
             startRingTimer();
         } catch (error) {
             console.warn("failed to start call", error);
@@ -616,6 +726,7 @@ export function initCallsModule(app) {
         }
 
         clearTimers();
+        stopRingtone();
 
         try {
             localStream = await acquireLocalStream(kind);
@@ -775,6 +886,7 @@ export function initCallsModule(app) {
 
         renderCallUi();
         setMinimized(false);
+        startRingtone("incoming");
         startRingTimer();
     }
 
@@ -792,6 +904,7 @@ export function initCallsModule(app) {
         }
 
         clearTimers();
+        stopRingtone();
 
         try {
             await setRemoteDescriptionSafe(peerConnection, payload.answer);
