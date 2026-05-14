@@ -48,14 +48,13 @@ export function initCallsModule(app) {
 
     const ringtonePatterns = {
         incoming: [
-            { frequency: 659.25, duration: 0.16 },
-            { frequency: 987.77, duration: 0.14 },
-            { frequency: 1318.51, duration: 0.2 },
-            { frequency: null, duration: 0.22 },
-            { frequency: 880.0, duration: 0.14 },
-            { frequency: 1318.51, duration: 0.16 },
-            { frequency: 1760.0, duration: 0.24 },
-            { frequency: null, duration: 0.74 },
+            { frequency: 523.25, duration: 0.2 },
+            { frequency: 659.25, duration: 0.18 },
+            { frequency: 783.99, duration: 0.22 },
+            { frequency: null, duration: 0.24 },
+            { frequency: 659.25, duration: 0.2 },
+            { frequency: 880.0, duration: 0.24 },
+            { frequency: null, duration: 0.72 },
         ],
         outgoing: [
             { frequency: 392.0, duration: 0.12 },

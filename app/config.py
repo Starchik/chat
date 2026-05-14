@@ -200,7 +200,7 @@ class Config:
     )
     WEBRTC_RINGTONE_INCOMING_VOLUME = max(
         0.0,
-        min(1.0, _env_float("WEBRTC_RINGTONE_INCOMING_VOLUME", 0.88)),
+        min(1.0, _env_float("WEBRTC_RINGTONE_INCOMING_VOLUME", 0.76)),
     )
     WEBRTC_RINGTONE_OUTGOING_VOLUME = max(
         0.0,
