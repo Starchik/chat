@@ -28,21 +28,21 @@
     };
 
     const defaultStatusByPhase = {
-        ringing_out: "РћР¶РёРґР°РЅРёРµ РѕС‚РІРµС‚Р°...",
-        ringing_in: "Р’С…РѕРґСЏС‰РёР№ РІС‹Р·РѕРІ",
-        connecting: "РџРѕРґРєР»СЋС‡РµРЅРёРµ...",
-        active: "РЎРѕРµРґРёРЅРµРЅРёРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ",
+        ringing_out: "\u041e\u0436\u0438\u0434\u0430\u043d\u0438\u0435 \u043e\u0442\u0432\u0435\u0442\u0430...",
+        ringing_in: "\u0412\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0432\u044b\u0437\u043e\u0432",
+        connecting: "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435...",
+        active: "\u0421\u043e\u0435\u0434\u0438\u043d\u0435\u043d\u0438\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e",
     };
 
     const reasonText = {
-        rejected: "Р—РІРѕРЅРѕРє РѕС‚РєР»РѕРЅРµРЅ",
-        busy: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ Р·Р°РЅСЏС‚",
-        offline: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС„Р»Р°Р№РЅ",
-        ended: "Р—РІРѕРЅРѕРє Р·Р°РІРµСЂС€РµРЅ",
-        disconnected: "РЎРѕР±РµСЃРµРґРЅРёРє РѕС‚РєР»СЋС‡РёР»СЃСЏ",
-        timeout: "Р’СЂРµРјСЏ РѕР¶РёРґР°РЅРёСЏ РёСЃС‚РµРєР»Рѕ",
-        failed: "РћС€РёР±РєР° СЃРѕРµРґРёРЅРµРЅРёСЏ",
-        unsupported: "Р—РІРѕРЅРєРё РЅРµ РїРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ РІ СЌС‚РѕРј Р±СЂР°СѓР·РµСЂРµ",
+        rejected: "\u0417\u0432\u043e\u043d\u043e\u043a \u043e\u0442\u043a\u043b\u043e\u043d\u0435\u043d",
+        busy: "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c \u0437\u0430\u043d\u044f\u0442",
+        offline: "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c \u043e\u0444\u043b\u0430\u0439\u043d",
+        ended: "\u0417\u0432\u043e\u043d\u043e\u043a \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d",
+        disconnected: "\u0421\u043e\u0431\u0435\u0441\u0435\u0434\u043d\u0438\u043a \u043e\u0442\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f",
+        timeout: "\u0412\u0440\u0435\u043c\u044f \u043e\u0436\u0438\u0434\u0430\u043d\u0438\u044f \u0438\u0441\u0442\u0435\u043a\u043b\u043e",
+        failed: "\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0435\u0434\u0438\u043d\u0435\u043d\u0438\u044f",
+        unsupported: "\u0417\u0432\u043e\u043d\u043a\u0438 \u043d\u0435 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044e\u0442\u0441\u044f \u0432 \u044d\u0442\u043e\u043c \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435",
         insecure_context: "\u0414\u043b\u044f \u0437\u0432\u043e\u043d\u043a\u043e\u0432 \u043d\u0443\u0436\u0435\u043d HTTPS (\u0438\u043b\u0438 localhost)",
     };
 
@@ -541,7 +541,7 @@
 
         const icon = callRefs.muteBtn.querySelector("i");
         callRefs.muteBtn.classList.toggle("is-active", Boolean(currentCall?.isMuted));
-        callRefs.muteBtn.setAttribute("aria-label", currentCall?.isMuted ? "Р’РєР»СЋС‡РёС‚СЊ РјРёРєСЂРѕС„РѕРЅ" : "Р’С‹РєР»СЋС‡РёС‚СЊ РјРёРєСЂРѕС„РѕРЅ");
+        callRefs.muteBtn.setAttribute("aria-label", currentCall?.isMuted ? "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d" : "\u0412\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d");
 
         if (icon) {
             icon.className = currentCall?.isMuted
@@ -560,7 +560,7 @@
         const enabled = Boolean(isVideoCall && localStream);
         callRefs.cameraBtn.disabled = !enabled;
         callRefs.cameraBtn.classList.toggle("is-active", Boolean(currentCall?.isCameraOff));
-        callRefs.cameraBtn.setAttribute("aria-label", currentCall?.isCameraOff ? "Р’РєР»СЋС‡РёС‚СЊ РєР°РјРµСЂСѓ" : "Р’С‹РєР»СЋС‡РёС‚СЊ РєР°РјРµСЂСѓ");
+        callRefs.cameraBtn.setAttribute("aria-label", currentCall?.isCameraOff ? "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u043a\u0430\u043c\u0435\u0440\u0443" : "\u0412\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u043a\u0430\u043c\u0435\u0440\u0443");
 
         if (icon) {
             icon.className = currentCall?.isCameraOff
@@ -581,10 +581,10 @@
         }
 
         if (callRefs.modeBadge) {
-            callRefs.modeBadge.textContent = currentCall.kind === "video" ? "Р’РёРґРµРѕР·РІРѕРЅРѕРє" : "РђСѓРґРёРѕР·РІРѕРЅРѕРє";
+            callRefs.modeBadge.textContent = currentCall.kind === "video" ? "\u0412\u0438\u0434\u0435\u043e\u0437\u0432\u043e\u043d\u043e\u043a" : "\u0410\u0443\u0434\u0438\u043e\u0437\u0432\u043e\u043d\u043e\u043a";
         }
         if (callRefs.peerName) {
-            callRefs.peerName.textContent = currentCall.peerName || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ";
+            callRefs.peerName.textContent = currentCall.peerName || "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c";
         }
         if (callRefs.peerAvatar) {
             callRefs.peerAvatar.src = currentCall.peerAvatar || helpers.avatarFallback(currentCall.peerName || "User");
@@ -651,7 +651,7 @@
         if (!chat) {
             return {
                 userId: fallback.userId || null,
-                name: fallback.name || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ",
+                name: fallback.name || "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c",
                 avatarUrl: fallback.avatarUrl || "",
                 isGroup: false,
             };
@@ -660,7 +660,7 @@
         if (chat.is_group) {
             return {
                 userId: fallback.userId || null,
-                name: fallback.name || chat.title || "Р“СЂСѓРїРїР°",
+                name: fallback.name || chat.title || "\u0413\u0440\u0443\u043f\u043f\u0430",
                 avatarUrl: fallback.avatarUrl || chat.avatar_url || "",
                 isGroup: true,
             };
@@ -669,7 +669,7 @@
         const peer = (chat.members || []).find((member) => member.id !== state.me?.id);
         return {
             userId: peer?.id || fallback.userId || null,
-            name: peer?.display_name || chat.title || fallback.name || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ",
+            name: peer?.display_name || chat.title || fallback.name || "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c",
             avatarUrl: peer?.avatar_url || chat.avatar_url || fallback.avatarUrl || "",
             isGroup: false,
         };
@@ -835,41 +835,41 @@
         }
 
         if (!deps.socket?.isConnected()) {
-            helpers.showToast("Realtime-СЃРѕРµРґРёРЅРµРЅРёРµ РµС‰Рµ РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ");
+            helpers.showToast("Realtime-\u0441\u043e\u0435\u0434\u0438\u043d\u0435\u043d\u0438\u0435 \u0435\u0449\u0435 \u043d\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e");
             return;
         }
 
         if (currentCall) {
-            helpers.showToast("Р—РІРѕРЅРѕРє СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ");
+            helpers.showToast("\u0417\u0432\u043e\u043d\u043e\u043a \u0443\u0436\u0435 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f");
             return;
         }
 
         if (!state.currentChatId) {
-            helpers.showToast("РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ С‡Р°С‚");
+            helpers.showToast("\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0447\u0430\u0442");
             return;
         }
 
         const chat = deps.chats?.getChatById(state.currentChatId);
         if (!chat) {
-            helpers.showToast("Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ");
+            helpers.showToast("\u0427\u0430\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d");
             return;
         }
 
         if (chat.is_group) {
-            helpers.showToast("Р“СЂСѓРїРїРѕРІС‹Рµ Р·РІРѕРЅРєРё РїРѕРєР° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ");
+            helpers.showToast("\u0413\u0440\u0443\u043f\u043f\u043e\u0432\u044b\u0435 \u0437\u0432\u043e\u043d\u043a\u0438 \u043f\u043e\u043a\u0430 \u043d\u0435 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044e\u0442\u0441\u044f");
             return;
         }
 
         const peer = resolvePeerByChat(chat.id);
         if (!peer.userId) {
-            helpers.showToast("РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ СЃРѕР±РµСЃРµРґРЅРёРєР°");
+            helpers.showToast("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442\u044c \u0441\u043e\u0431\u0435\u0441\u0435\u0434\u043d\u0438\u043a\u0430");
             return;
         }
 
         try {
             localStream = await acquireLocalStream(kind);
         } catch (error) {
-            helpers.showToast("РќРµС‚ РґРѕСЃС‚СѓРїР° Рє РјРёРєСЂРѕС„РѕРЅСѓ/РєР°РјРµСЂРµ");
+            helpers.showToast("\u041d\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u0430 \u043a \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d\u0443/\u043a\u0430\u043c\u0435\u0440\u0435");
             return;
         }
 
@@ -951,7 +951,7 @@
             });
             await finishCall({
                 reason: "failed",
-                toast: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє РјРёРєСЂРѕС„РѕРЅСѓ/РєР°РјРµСЂРµ",
+                toast: "\u041d\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u0430 \u043a \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d\u0443/\u043a\u0430\u043c\u0435\u0440\u0435",
             });
             return;
         }
@@ -1080,7 +1080,7 @@
 
         const peer = resolvePeerByChat(payload.chat_id, {
             userId: payload.from_user_id || null,
-            name: payload.from_display_name || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ",
+            name: payload.from_display_name || "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c",
             avatarUrl: "",
         });
 
