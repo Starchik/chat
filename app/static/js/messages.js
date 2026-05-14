@@ -805,7 +805,7 @@
     }
 
     function renderMessages(chatId) {
-        const messages = getChatMessages(chatId);
+        const messages = getChatMessages(chatId).filter((message) => !message?.is_deleted);
         refs.messagesList.innerHTML = "";
 
         let previousMessage = null;
@@ -1315,17 +1315,7 @@
         }
 
         const messages = getChatMessages(chatId);
-        const nextMessages = messages.map((item) => (
-            item.id === messageId
-                ? {
-                    ...item,
-                    is_deleted: true,
-                    content: null,
-                    attachments: [],
-                    message_type: "text",
-                }
-                : item
-        ));
+        const nextMessages = messages.filter((item) => item.id !== messageId);
 
         setChatMessages(chatId, nextMessages);
 
