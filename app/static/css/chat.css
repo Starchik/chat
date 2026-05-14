@@ -1135,6 +1135,10 @@
     transition: transform var(--ease), box-shadow var(--ease), border-color var(--ease), background var(--ease);
 }
 
+body.call-minimized .scroll-latest-fab {
+    right: 4.6rem;
+}
+
 .scroll-latest-fab:hover {
     transform: translateY(-1px);
     border-color: rgba(157, 220, 255, 0.82);

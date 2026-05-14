@@ -257,6 +257,10 @@
         width: 46px;
         height: 46px;
     }
+
+    body.call-minimized .scroll-latest-fab {
+        right: 3.85rem;
+    }
 }
 
 @media (max-width: 440px) {

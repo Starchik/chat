@@ -532,6 +532,7 @@
         isMinimized = Boolean(next);
         callRefs.overlay?.classList.toggle("hidden", isMinimized || !currentCall);
         callRefs.expandFab?.classList.toggle("hidden", !isMinimized || !currentCall);
+        document.body?.classList.toggle("call-minimized", isMinimized && Boolean(currentCall));
     }
 
     function updateMuteButton() {
