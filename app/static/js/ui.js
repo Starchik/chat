@@ -676,9 +676,9 @@ async function boot() {
     const queryChatId = Number(new URLSearchParams(window.location.search).get("chat"));
     if (queryChatId && Number.isInteger(queryChatId)) {
         await chats.openChat(queryChatId);
-    } else if (app.state.chats.length > 0) {
-        await chats.openChat(app.state.chats[0].id);
     } else {
+        app.state.currentChatId = null;
+        refs.messagesList.innerHTML = "";
         app.helpers.setChatHeader(null);
         app.helpers.setMessagesEmptyState(true);
     }
