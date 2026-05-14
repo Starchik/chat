@@ -262,7 +262,10 @@
     function renderAttachment(attachment) {
         const mediaKind = detectAttachmentKind(attachment);
         const fileName = helpers.escapeHtml(attachment.file_name || "Файл");
-        const fileUrl = attachment.file_url || "#";
+        const rawFileUrl = String(attachment.file_url || "#");
+        const rawPreviewUrl = String(attachment.preview_url || rawFileUrl);
+        const fileUrl = helpers.escapeHtml(rawFileUrl);
+        const previewUrl = helpers.escapeHtml(rawPreviewUrl);
         const mime = helpers.escapeHtml(attachment.mime_type || "");
 
         if (mediaKind === "image") {
@@ -277,7 +280,7 @@
                         data-name="${fileName}"
                         data-mime="${mime}"
                     >
-                        <img class="message__file-image" src="${fileUrl}" alt="${fileName}" loading="lazy" />
+                        <img class="message__file-image" src="${previewUrl}" alt="${fileName}" loading="lazy" />
                     </a>
                 </div>
             `;

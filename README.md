@@ -173,3 +173,17 @@ Env knobs:
 - `GUNICORN_TIMEOUT=120`
 
 If you need old behavior for debugging, set `APP_SERVER=python`.
+
+## Image preview thumbnails
+
+Image attachments now render lightweight WebP previews in chat, while opening the original file on click.
+
+Env knobs:
+- `IMAGE_PREVIEW_MAX_SIDE=720` (max width/height of generated preview)
+- `IMAGE_PREVIEW_WEBP_QUALITY=68` (WebP quality for preview)
+
+Apply changes:
+
+```bash
+docker compose up -d --build messenger
+```

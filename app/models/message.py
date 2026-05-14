@@ -1,7 +1,9 @@
 ﻿from sqlalchemy import UniqueConstraint
 
+from flask import current_app
+
 from app.extensions import db
-from app.utils import isoformat_or_none, utcnow
+from app.utils import generate_image_preview, isoformat_or_none, preview_storage_name, utcnow
 
 
 class Message(db.Model):
@@ -114,6 +116,37 @@ class MessageAttachment(db.Model):
 
     message = db.relationship("Message", back_populates="attachments")
 
+    def _resolve_preview_url(self):
+        if self.kind != "image" or not self.stored_name:
+            return self.file_url
+
+        preview_name = preview_storage_name(self.stored_name)
+        if not preview_name:
+            return self.file_url
+
+        try:
+            uploads_dir = current_app.config.get("FILE_UPLOAD_FOLDER")
+            if uploads_dir is None:
+                return self.file_url
+
+            preview_path = uploads_dir / preview_name
+            if preview_path.exists():
+                return f"/static/uploads/files/{preview_name}"
+
+            original_path = uploads_dir / self.stored_name
+            generated = generate_image_preview(
+                source_path=original_path,
+                preview_path=preview_path,
+                max_side=int(current_app.config.get("IMAGE_PREVIEW_MAX_SIDE", 720)),
+                quality=int(current_app.config.get("IMAGE_PREVIEW_WEBP_QUALITY", 68)),
+            )
+            if generated and preview_path.exists():
+                return f"/static/uploads/files/{preview_name}"
+        except Exception:
+            return self.file_url
+
+        return self.file_url
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -122,6 +155,7 @@ class MessageAttachment(db.Model):
             "file_name": self.file_name,
             "stored_name": self.stored_name,
             "file_url": self.file_url,
+            "preview_url": self._resolve_preview_url(),
             "mime_type": self.mime_type,
             "file_size": self.file_size,
             "kind": self.kind,

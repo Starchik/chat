@@ -11,7 +11,7 @@ from app.models import (
     MessageRead,
     PinnedMessage,
 )
-from app.utils import utcnow
+from app.utils import preview_storage_name, utcnow
 
 
 class MessageService:
@@ -124,7 +124,11 @@ class MessageService:
         attachment_file_paths = []
         for attachment in list(message.attachments):
             if attachment.stored_name:
-                attachment_file_paths.append(current_app.config["FILE_UPLOAD_FOLDER"] / attachment.stored_name)
+                upload_folder = current_app.config["FILE_UPLOAD_FOLDER"]
+                attachment_file_paths.append(upload_folder / attachment.stored_name)
+                preview_name = preview_storage_name(attachment.stored_name)
+                if preview_name:
+                    attachment_file_paths.append(upload_folder / preview_name)
             db.session.delete(attachment)
 
         PinnedMessage.query.filter_by(chat_id=message.chat_id, message_id=message.id).delete()

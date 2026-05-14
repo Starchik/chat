@@ -13,11 +13,17 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.extensions import socketio
 from app.models import Chat, ChatMembership, Message
 from app.services import ChatService, MessageService, PushService
-from app.utils import make_storage_filename, sanitize_filename
+from app.utils import (
+    generate_image_preview,
+    make_storage_filename,
+    preview_storage_name,
+    sanitize_filename,
+)
 
 
 messages_bp = Blueprint("messages", __name__, url_prefix="/messages")
 UPLOAD_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
+PREVIEW_SUFFIX = "__preview.webp"
 
 
 def _attachment_kind_for_name(safe_name: str):
@@ -47,6 +53,9 @@ def _store_uploaded_files(files):
         file_path = current_app.config["FILE_UPLOAD_FOLDER"] / stored_name
 
         file.save(file_path)
+        if kind == "image":
+            _ensure_image_preview(file_path, stored_name)
+
         file_size = os.path.getsize(file_path)
 
         attachments.append(
@@ -61,6 +70,35 @@ def _store_uploaded_files(files):
         )
 
     return attachments, None, None
+
+
+def _preview_stored_name(stored_name: str) -> str:
+    return preview_storage_name(stored_name, suffix=PREVIEW_SUFFIX)
+
+
+def _preview_path(stored_name: str):
+    preview_name = _preview_stored_name(stored_name)
+    if not preview_name:
+        return None
+    return current_app.config["FILE_UPLOAD_FOLDER"] / preview_name
+
+
+def _ensure_image_preview(source_path, stored_name: str):
+    preview_path = _preview_path(stored_name)
+    if preview_path is None:
+        return
+
+    max_side = int(current_app.config.get("IMAGE_PREVIEW_MAX_SIDE", 720))
+    quality = int(current_app.config.get("IMAGE_PREVIEW_WEBP_QUALITY", 68))
+
+    generated = generate_image_preview(
+        source_path=source_path,
+        preview_path=preview_path,
+        max_side=max_side,
+        quality=quality,
+    )
+    if not generated:
+        current_app.logger.warning("Failed to build image preview for '%s'", stored_name)
 
 
 def _is_valid_upload_id(upload_id: str) -> bool:
@@ -247,13 +285,18 @@ def _consume_chunk_uploads(upload_ids, user_id: int, chat_id: int):
         except FileNotFoundError:
             pass
 
+        if kind == "image":
+            _ensure_image_preview(final_path, stored_name)
+
+        final_size = os.path.getsize(final_path)
+
         attachments.append(
             {
                 "file_name": file_name,
                 "stored_name": stored_name,
                 "file_url": f"/static/uploads/files/{stored_name}",
                 "mime_type": mime_type,
-                "file_size": os.path.getsize(final_path),
+                "file_size": final_size,
                 "kind": "image" if kind == "image" else "file",
             }
         )

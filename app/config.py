@@ -162,6 +162,8 @@ class Config:
     UPLOAD_CHUNK_SIZE = int(os.getenv("UPLOAD_CHUNK_SIZE", str(1024 * 1024)))
     MAX_CHUNKED_FILE_SIZE = int(os.getenv("MAX_CHUNKED_FILE_SIZE", str(1024 * 1024 * 1024)))
     CHUNK_UPLOAD_TTL_SEC = int(os.getenv("CHUNK_UPLOAD_TTL_SEC", "7200"))
+    IMAGE_PREVIEW_MAX_SIDE = max(256, min(1920, int(os.getenv("IMAGE_PREVIEW_MAX_SIDE", "720"))))
+    IMAGE_PREVIEW_WEBP_QUALITY = max(35, min(95, int(os.getenv("IMAGE_PREVIEW_WEBP_QUALITY", "68"))))
     ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
     ALLOWED_FILE_EXTENSIONS = {
         "txt", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "rar",
