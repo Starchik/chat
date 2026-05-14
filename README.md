@@ -160,3 +160,16 @@ curl http://127.0.0.1:5000/health
 - Обязательно смените все секреты из `.env.example`.
 - `JWT_SECRET_KEY` короче 32 байт вызывает предупреждения безопасности.
 - Не публикуйте реальный `.env` в репозиторий.
+
+## Runtime profile in Docker
+
+By default the container now starts with Gunicorn (`gthread`) via `start.sh`.
+This avoids relying on Werkzeug in production and improves stability for `/health` and Socket.IO.
+
+Env knobs:
+- `APP_SERVER=gunicorn` (default) or `APP_SERVER=python`
+- `GUNICORN_WORKERS=1`
+- `GUNICORN_THREADS=100`
+- `GUNICORN_TIMEOUT=120`
+
+If you need old behavior for debugging, set `APP_SERVER=python`.

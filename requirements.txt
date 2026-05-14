@@ -7,3 +7,4 @@ eventlet==0.37.0
 pywebpush==2.0.3
 cryptography==44.0.0
 gunicorn==23.0.0
+simple-websocket==1.1.0
