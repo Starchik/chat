@@ -600,6 +600,11 @@
 
     async function openChat(chatId) {
         const id = Number(chatId);
+        const isMobileLayout = window.matchMedia("(max-width: 900px)").matches;
+
+        if (isMobileLayout) {
+            helpers.setSidebarOpen(false);
+        }
 
         let chat = getChatById(id);
         if (!chat) {
@@ -624,10 +629,6 @@
         state.currentChatId = id;
         renderChatList();
         helpers.setChatHeader(chat);
-
-        if (window.innerWidth <= 900) {
-            helpers.setSidebarOpen(false);
-        }
 
         if (deps.messages) {
             await deps.messages.openChat(id, chat);
