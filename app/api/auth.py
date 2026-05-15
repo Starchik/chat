@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from flask import Blueprint, current_app, jsonify, make_response, request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 
@@ -128,10 +130,22 @@ def upload_avatar():
     safe_name = sanitize_filename(avatar.filename)
     stored_name = make_storage_filename(safe_name)
     destination = current_app.config["AVATAR_UPLOAD_FOLDER"] / stored_name
+    previous_avatar_path = (user.avatar_path or "").strip()
 
     avatar.save(destination)
 
     user.avatar_path = f"/static/uploads/avatars/{stored_name}"
     db.session.commit()
+
+    if previous_avatar_path.startswith("/static/uploads/avatars/"):
+        old_name = Path(previous_avatar_path).name
+        old_path = current_app.config["AVATAR_UPLOAD_FOLDER"] / old_name
+        if old_path != destination:
+            try:
+                if old_path.exists():
+                    old_path.unlink()
+            except Exception:
+                # Avatar update should succeed even if old file cleanup fails.
+                pass
 
     return jsonify({"avatar_url": user.avatar_path, "user": user.to_dict()})

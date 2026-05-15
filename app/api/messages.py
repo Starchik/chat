@@ -14,6 +14,7 @@ from app.extensions import socketio
 from app.models import Chat, ChatMembership, Message, MessageAttachment
 from app.security.attachment_access import get_attachment_user_id_from_cookie
 from app.services import ChatService, MessageService, PushService
+from app.services.chunk_upload_service import cleanup_stale_chunk_uploads
 from app.utils import (
     generate_image_preview,
     make_storage_filename,
@@ -172,51 +173,6 @@ def _read_chunk_meta(upload_id: str):
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
-
-
-def _cleanup_stale_chunk_uploads():
-    base_folder = current_app.config["CHUNK_UPLOAD_FOLDER"]
-    ttl_sec = max(300, int(current_app.config.get("CHUNK_UPLOAD_TTL_SEC", 7200)))
-    now = int(time.time())
-
-    for meta_path in base_folder.glob("*.json"):
-        stale = False
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            updated_at = int(meta.get("updated_at") or meta.get("created_at") or 0)
-            stale = updated_at <= 0 or (now - updated_at) > ttl_sec
-        except Exception:
-            stale = True
-
-        if not stale:
-            continue
-
-        upload_id = meta_path.stem
-        part_path = _chunk_part_path(upload_id)
-
-        try:
-            meta_path.unlink()
-        except FileNotFoundError:
-            pass
-
-        try:
-            part_path.unlink()
-        except FileNotFoundError:
-            pass
-
-    for part_path in base_folder.glob("*.part"):
-        upload_id = part_path.stem
-        if _chunk_meta_path(upload_id).exists():
-            continue
-
-        age_sec = now - int(part_path.stat().st_mtime)
-        if age_sec <= ttl_sec:
-            continue
-
-        try:
-            part_path.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def _normalize_upload_ids(raw_value):
@@ -457,7 +413,7 @@ def init_chunk_upload():
         max_mb = round(max_chunked_file_size / (1024 * 1024), 2)
         return jsonify({"error": f"Файл слишком большой (лимит: {max_mb} MB)"}), 413
 
-    _cleanup_stale_chunk_uploads()
+    cleanup_stale_chunk_uploads()
 
     requested_chunk_size = int(current_app.config.get("UPLOAD_CHUNK_SIZE", 1024 * 1024))
     max_request_size = int(current_app.config.get("MAX_CONTENT_LENGTH") or 0)

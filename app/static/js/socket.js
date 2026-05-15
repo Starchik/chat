@@ -10,6 +10,63 @@
     let socket = null;
     let presenceTimer = null;
     let warnedConnectionFailure = false;
+    let connectionIssueTimer = null;
+
+    const CONNECTION_ISSUE_TOAST_DELAY_MS = 7000;
+    const MIN_FAILURES_BEFORE_TOAST = 2;
+    let connectErrorCount = 0;
+
+    function clearConnectionIssueTimer() {
+        if (connectionIssueTimer) {
+            window.clearTimeout(connectionIssueTimer);
+            connectionIssueTimer = null;
+        }
+    }
+
+    function shouldSuppressConnectionToast() {
+        if (document.hidden) {
+            return true;
+        }
+
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function scheduleConnectionIssueToast() {
+        if (warnedConnectionFailure) {
+            return;
+        }
+
+        if (connectErrorCount < MIN_FAILURES_BEFORE_TOAST) {
+            return;
+        }
+
+        if (shouldSuppressConnectionToast()) {
+            return;
+        }
+
+        if (connectionIssueTimer) {
+            return;
+        }
+
+        connectionIssueTimer = window.setTimeout(() => {
+            connectionIssueTimer = null;
+
+            if (!socket || socket.connected) {
+                return;
+            }
+
+            if (shouldSuppressConnectionToast()) {
+                return;
+            }
+
+            warnedConnectionFailure = true;
+            helpers.showToast("Проблема с realtime-соединением");
+        }, CONNECTION_ISSUE_TOAST_DELAY_MS);
+    }
 
     function clearPresenceTimer() {
         if (presenceTimer) {
@@ -57,7 +114,9 @@
         });
 
         socket.on("connect", () => {
+            connectErrorCount = 0;
             warnedConnectionFailure = false;
+            clearConnectionIssueTimer();
             emitSafe("presence_ping");
             startPresenceTimer();
 
@@ -68,14 +127,13 @@
 
         socket.on("disconnect", () => {
             clearPresenceTimer();
+            scheduleConnectionIssueToast();
         });
 
         socket.on("connect_error", (error) => {
             console.warn("socket connect error", error?.message || error);
-            if (!warnedConnectionFailure) {
-                warnedConnectionFailure = true;
-                helpers.showToast("Проблема с realtime-соединением");
-            }
+            connectErrorCount += 1;
+            scheduleConnectionIssueToast();
         });
 
         socket.on("new_message", (payload) => {

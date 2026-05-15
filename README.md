@@ -257,3 +257,23 @@ docker compose logs --tail=120 messenger
 - For single-node setup with high concurrent sockets, `gevent` + Redis queue is the recommended baseline.
 - If you stay on SQLite, keep `DATABASE_URL=sqlite:////app/instance/chat.db` and do **not** expect high write throughput.
 
+## Maintenance automation
+
+- Stale chunk uploads are cleaned:
+1. on each chunk-upload init request
+2. on app startup
+3. in a periodic background worker
+
+Env knobs:
+- `CHUNK_UPLOAD_TTL_SEC=7200` (stale threshold)
+- `CHUNK_CLEANUP_INTERVAL_SEC=600` (background cleanup interval)
+- `CHUNK_CLEANUP_BACKGROUND=1` (set `0` to disable background cleanup)
+- `MESSAGE_RETENTION_ENABLED=0` (disabled by default)
+- `MESSAGE_RETENTION_DAYS=0` (set > 0 only when retention is enabled)
+- `MESSAGE_RETENTION_INTERVAL_SEC=3600` (retention worker interval)
+- `MESSAGE_RETENTION_BATCH_SIZE=500`
+- `MESSAGE_RETENTION_MAX_BATCHES_PER_RUN=5`
+
+- Replacing an avatar now removes the previous avatar file from `app/static/uploads/avatars` (best-effort cleanup).
+- Docker services use json-file log rotation (`max-size=10m`, `max-file=5`) to limit disk growth.
+

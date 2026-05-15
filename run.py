@@ -1,5 +1,6 @@
 import os
 import sys
+from importlib.util import find_spec
 
 
 def _normalize_async_mode(value: str) -> str:
@@ -17,9 +18,29 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _module_available(name: str) -> bool:
+    try:
+        return find_spec(name) is not None
+    except Exception:
+        return False
+
+
 def _prepare_async_mode() -> None:
     requested_mode = _normalize_async_mode(os.getenv("SOCKETIO_ASYNC_MODE", "threading"))
     force_eventlet = _env_bool("SOCKETIO_FORCE_EVENTLET", False)
+
+    if requested_mode == "gevent" and not _module_available("gevent"):
+        os.environ["SOCKETIO_ASYNC_MODE"] = "threading"
+        print("[startup] gevent unavailable, fallback to threading.")
+        return
+
+    if requested_mode == "gevent_uwsgi":
+        has_gevent = _module_available("gevent")
+        has_uwsgi = _module_available("uwsgi")
+        if not (has_gevent and has_uwsgi):
+            os.environ["SOCKETIO_ASYNC_MODE"] = "threading"
+            print("[startup] gevent_uwsgi unavailable, fallback to threading.")
+            return
 
     if requested_mode != "eventlet":
         os.environ["SOCKETIO_ASYNC_MODE"] = requested_mode

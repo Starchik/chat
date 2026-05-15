@@ -42,6 +42,21 @@ def _env_float(name: str, default: float):
         return default
 
 
+def _env_int(name: str, default: int, *, min_value: int | None = None):
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        value = default
+    else:
+        try:
+            value = int(raw_value.strip())
+        except Exception:
+            value = default
+
+    if min_value is not None:
+        return max(min_value, value)
+    return value
+
+
 def _normalize_ice_servers(raw_servers):
     normalized_servers = []
 
@@ -163,6 +178,13 @@ class Config:
     UPLOAD_CHUNK_SIZE = int(os.getenv("UPLOAD_CHUNK_SIZE", str(1024 * 1024)))
     MAX_CHUNKED_FILE_SIZE = int(os.getenv("MAX_CHUNKED_FILE_SIZE", str(1024 * 1024 * 1024)))
     CHUNK_UPLOAD_TTL_SEC = int(os.getenv("CHUNK_UPLOAD_TTL_SEC", "7200"))
+    CHUNK_CLEANUP_INTERVAL_SEC = _env_int("CHUNK_CLEANUP_INTERVAL_SEC", 600, min_value=60)
+    CHUNK_CLEANUP_BACKGROUND = _env_bool("CHUNK_CLEANUP_BACKGROUND", True)
+    MESSAGE_RETENTION_ENABLED = _env_bool("MESSAGE_RETENTION_ENABLED", False)
+    MESSAGE_RETENTION_DAYS = _env_int("MESSAGE_RETENTION_DAYS", 0, min_value=0)
+    MESSAGE_RETENTION_INTERVAL_SEC = _env_int("MESSAGE_RETENTION_INTERVAL_SEC", 3600, min_value=300)
+    MESSAGE_RETENTION_BATCH_SIZE = _env_int("MESSAGE_RETENTION_BATCH_SIZE", 500, min_value=10)
+    MESSAGE_RETENTION_MAX_BATCHES_PER_RUN = _env_int("MESSAGE_RETENTION_MAX_BATCHES_PER_RUN", 5, min_value=1)
     IMAGE_PREVIEW_MAX_SIDE = max(256, min(1920, int(os.getenv("IMAGE_PREVIEW_MAX_SIDE", "720"))))
     IMAGE_PREVIEW_WEBP_QUALITY = max(35, min(95, int(os.getenv("IMAGE_PREVIEW_WEBP_QUALITY", "68"))))
     ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}

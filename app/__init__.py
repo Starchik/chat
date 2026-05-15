@@ -1,3 +1,6 @@
+import os
+import threading
+import time
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -9,8 +12,15 @@ from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from app.api import register_api
 from app.config import Config
 from app.extensions import db, init_extensions
+from app.services.chunk_upload_service import cleanup_stale_chunk_uploads
+from app.services.message_retention_service import cleanup_expired_messages
 from app.sockets import register_sockets
 from app.utils import b64url_encode, ensure_directories
+
+_chunk_cleanup_worker_started = False
+_chunk_cleanup_worker_lock = threading.Lock()
+_message_retention_worker_started = False
+_message_retention_worker_lock = threading.Lock()
 
 
 def _ensure_vapid_keys(app):
@@ -41,6 +51,83 @@ def _ensure_vapid_keys(app):
     app.config["VAPID_PUBLIC_KEY"] = public_key_b64
 
 
+def _start_chunk_cleanup_worker(app):
+    global _chunk_cleanup_worker_started
+
+    if not app.config.get("CHUNK_CLEANUP_BACKGROUND", True):
+        return
+
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
+    with _chunk_cleanup_worker_lock:
+        if _chunk_cleanup_worker_started:
+            return
+        _chunk_cleanup_worker_started = True
+
+    interval_sec = max(60, int(app.config.get("CHUNK_CLEANUP_INTERVAL_SEC", 600)))
+
+    def _worker():
+        while True:
+            try:
+                with app.app_context():
+                    removed = cleanup_stale_chunk_uploads(app=app)
+                    if removed > 0:
+                        app.logger.info("Chunk cleanup removed %s stale file(s)", removed)
+            except Exception:
+                app.logger.exception("Chunk cleanup worker failed")
+
+            time.sleep(interval_sec)
+
+    thread = threading.Thread(
+        target=_worker,
+        name="chunk-cleanup-worker",
+        daemon=True,
+    )
+    thread.start()
+
+
+def _start_message_retention_worker(app):
+    global _message_retention_worker_started
+
+    if not app.config.get("MESSAGE_RETENTION_ENABLED", False):
+        return
+
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
+    with _message_retention_worker_lock:
+        if _message_retention_worker_started:
+            return
+        _message_retention_worker_started = True
+
+    interval_sec = max(300, int(app.config.get("MESSAGE_RETENTION_INTERVAL_SEC", 3600)))
+
+    def _worker():
+        while True:
+            try:
+                with app.app_context():
+                    result = cleanup_expired_messages(app=app)
+                    if result.get("deleted_messages", 0) > 0 or result.get("deleted_files", 0) > 0:
+                        app.logger.info(
+                            "Message retention removed %s message(s), %s file(s) across %s chat(s)",
+                            result.get("deleted_messages", 0),
+                            result.get("deleted_files", 0),
+                            result.get("affected_chats", 0),
+                        )
+            except Exception:
+                app.logger.exception("Message retention worker failed")
+
+            time.sleep(interval_sec)
+
+    thread = threading.Thread(
+        target=_worker,
+        name="message-retention-worker",
+        daemon=True,
+    )
+    thread.start()
+
+
 def create_app():
     load_dotenv()
 
@@ -64,6 +151,26 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        try:
+            removed = cleanup_stale_chunk_uploads(app=app)
+            if removed > 0:
+                app.logger.info("Chunk cleanup removed %s stale file(s) on startup", removed)
+        except Exception:
+            app.logger.exception("Chunk cleanup on startup failed")
+        try:
+            result = cleanup_expired_messages(app=app)
+            if result.get("deleted_messages", 0) > 0 or result.get("deleted_files", 0) > 0:
+                app.logger.info(
+                    "Message retention removed %s message(s), %s file(s) across %s chat(s) on startup",
+                    result.get("deleted_messages", 0),
+                    result.get("deleted_files", 0),
+                    result.get("affected_chats", 0),
+                )
+        except Exception:
+            app.logger.exception("Message retention on startup failed")
+
+    _start_chunk_cleanup_worker(app)
+    _start_message_retention_worker(app)
 
     def asset_url(filename: str) -> str:
         static_root = Path(app.static_folder or "")
