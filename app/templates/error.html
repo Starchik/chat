@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
-    <title>{{ status_code }} · {{ title }}</title>
+    <title>{{ status_code }} • {{ title }}</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,7 +23,7 @@
         })();
     </script>
 </head>
-<body class="error-body">
+<body class="error-body error-body--{{ variant|default('generic') }}">
     <div class="error-bg" aria-hidden="true">
         <div class="error-bg__orb error-bg__orb--one"></div>
         <div class="error-bg__orb error-bg__orb--two"></div>
@@ -32,6 +32,16 @@
 
     <main class="error-shell">
         <section class="error-card">
+            <div class="error-status">
+                <span class="error-status__label">{{ label or "Ошибка" }}</span>
+                <span class="error-status__http">HTTP {{ status_code }}</span>
+            </div>
+            <div class="error-icon-wrap">
+                <div class="error-icon-ring" aria-hidden="true"></div>
+                <div class="error-icon">
+                    <i class="{{ icon|default('fa-solid fa-circle-exclamation') }}"></i>
+                </div>
+            </div>
             <div class="error-code">{{ status_code }}</div>
             <h1 class="error-title">{{ title }}</h1>
             <p class="error-message">{{ message }}</p>

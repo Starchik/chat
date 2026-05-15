@@ -110,26 +110,41 @@ def create_app():
             "title": "Требуется авторизация",
             "message": "Для доступа к этой странице нужно войти в аккаунт.",
             "hint": "Проверьте, что вы авторизованы, и попробуйте открыть страницу снова.",
+            "label": "Нужен вход",
+            "icon": "fa-solid fa-user-lock",
+            "variant": "auth",
         },
         403: {
             "title": "Доступ запрещен",
             "message": "У вас нет прав для просмотра этой страницы или ресурса.",
             "hint": "Если это ошибка, обратитесь к администратору или владельцу чата.",
+            "label": "Нет доступа",
+            "icon": "fa-solid fa-shield-halved",
+            "variant": "forbidden",
         },
         404: {
             "title": "Страница не найдена",
             "message": "Запрошенный адрес не существует или уже был удален.",
             "hint": "Проверьте ссылку или перейдите на главную страницу.",
+            "label": "Не найдено",
+            "icon": "fa-solid fa-magnifying-glass",
+            "variant": "missing",
         },
         413: {
             "title": "Файл слишком большой",
             "message": "Размер запроса превышает допустимый лимит сервера.",
             "hint": "Для больших файлов используйте загрузку частями.",
+            "label": "Слишком большой файл",
+            "icon": "fa-solid fa-file-circle-xmark",
+            "variant": "payload",
         },
         500: {
             "title": "Ошибка сервера",
             "message": "На сервере произошла внутренняя ошибка.",
             "hint": "Попробуйте обновить страницу немного позже.",
+            "label": "Ошибка сервера",
+            "icon": "fa-solid fa-triangle-exclamation",
+            "variant": "server",
         },
     }
 
@@ -148,6 +163,9 @@ def create_app():
                 "title": f"Ошибка {status_code}",
                 "message": "Произошла ошибка при обработке запроса.",
                 "hint": "Проверьте адрес страницы или попробуйте выполнить действие позже.",
+                "label": "Ошибка",
+                "icon": "fa-solid fa-circle-exclamation",
+                "variant": "generic",
             }
         return (
             render_template(
@@ -156,6 +174,9 @@ def create_app():
                 title=meta["title"],
                 message=message_override or meta["message"],
                 hint=meta["hint"],
+                label=meta["label"],
+                icon=meta["icon"],
+                variant=meta["variant"],
             ),
             status_code,
         )

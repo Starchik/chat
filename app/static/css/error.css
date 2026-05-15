@@ -80,6 +80,59 @@
     pointer-events: none;
 }
 
+.error-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.46rem;
+    padding: 0.24rem 0.58rem;
+    border-radius: 999px;
+    border: 1px solid rgba(150, 206, 255, 0.4);
+    background: rgba(21, 34, 58, 0.52);
+    margin-bottom: 0.9rem;
+}
+
+.error-status__label {
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(182, 225, 255, 0.96);
+    font-weight: 700;
+}
+
+.error-status__http {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+}
+
+.error-icon-wrap {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    margin: 0 auto 0.9rem;
+}
+
+.error-icon-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(150, 206, 255, 0.35);
+    background: radial-gradient(circle, rgba(126, 206, 255, 0.17), transparent 68%);
+    box-shadow: 0 0 0 10px rgba(109, 195, 255, 0.06);
+}
+
+.error-icon {
+    position: absolute;
+    inset: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(167, 220, 255, 0.58);
+    background: rgba(15, 28, 51, 0.74);
+    display: grid;
+    place-items: center;
+    color: #d8f2ff;
+    font-size: 1.28rem;
+    box-shadow: 0 12px 28px rgba(10, 26, 52, 0.36);
+}
+
 .error-code {
     font-size: clamp(3rem, 16vw, 7rem);
     font-weight: 800;
@@ -124,6 +177,108 @@
     flex-wrap: wrap;
 }
 
+.error-body--auth .error-bg__orb--one {
+    background: radial-gradient(circle, rgba(84, 180, 255, 0.36), transparent 72%);
+}
+
+.error-body--auth .error-status,
+.error-body--auth .error-icon-ring {
+    border-color: rgba(112, 196, 255, 0.45);
+}
+
+.error-body--forbidden .error-bg__orb--one {
+    background: radial-gradient(circle, rgba(255, 122, 176, 0.31), transparent 72%);
+}
+
+.error-body--forbidden .error-bg__orb--two {
+    background: radial-gradient(circle, rgba(255, 146, 94, 0.27), transparent 74%);
+}
+
+.error-body--forbidden .error-status {
+    border-color: rgba(255, 150, 189, 0.46);
+    background: rgba(61, 24, 44, 0.48);
+}
+
+.error-body--forbidden .error-status__label {
+    color: rgba(255, 208, 230, 0.96);
+}
+
+.error-body--forbidden .error-icon-ring {
+    border-color: rgba(255, 160, 204, 0.45);
+    background: radial-gradient(circle, rgba(255, 136, 194, 0.18), transparent 70%);
+}
+
+.error-body--forbidden .error-icon {
+    border-color: rgba(255, 177, 217, 0.62);
+    color: rgba(255, 231, 242, 0.98);
+}
+
+.error-body--missing .error-bg__orb--one {
+    background: radial-gradient(circle, rgba(110, 168, 255, 0.36), transparent 72%);
+}
+
+.error-body--missing .error-bg__orb--three {
+    background: radial-gradient(circle, rgba(115, 116, 255, 0.24), transparent 74%);
+}
+
+.error-body--missing .error-status {
+    border-color: rgba(145, 173, 255, 0.5);
+}
+
+.error-body--payload .error-bg__orb--one {
+    background: radial-gradient(circle, rgba(255, 195, 120, 0.34), transparent 72%);
+}
+
+.error-body--payload .error-bg__orb--two {
+    background: radial-gradient(circle, rgba(255, 147, 92, 0.28), transparent 74%);
+}
+
+.error-body--payload .error-status {
+    border-color: rgba(255, 193, 133, 0.54);
+    background: rgba(61, 37, 19, 0.46);
+}
+
+.error-body--payload .error-status__label {
+    color: rgba(255, 226, 181, 0.98);
+}
+
+.error-body--payload .error-icon-ring {
+    border-color: rgba(255, 201, 151, 0.5);
+    background: radial-gradient(circle, rgba(255, 184, 120, 0.2), transparent 70%);
+}
+
+.error-body--payload .error-icon {
+    border-color: rgba(255, 214, 171, 0.62);
+    color: rgba(255, 235, 211, 0.98);
+}
+
+.error-body--server .error-bg__orb--one {
+    background: radial-gradient(circle, rgba(255, 120, 120, 0.3), transparent 72%);
+}
+
+.error-body--server .error-bg__orb--two {
+    background: radial-gradient(circle, rgba(180, 97, 255, 0.26), transparent 74%);
+}
+
+.error-body--server .error-status {
+    border-color: rgba(255, 162, 185, 0.52);
+    background: rgba(52, 24, 43, 0.5);
+}
+
+.error-body--server .error-status__label {
+    color: rgba(255, 219, 228, 0.98);
+}
+
+.error-body--server .error-icon-ring {
+    border-color: rgba(255, 168, 196, 0.5);
+    background: radial-gradient(circle, rgba(255, 126, 177, 0.18), transparent 70%);
+}
+
+.error-body--server .error-icon {
+    border-color: rgba(255, 183, 212, 0.64);
+    color: rgba(255, 230, 243, 0.98);
+}
+
 [data-theme="light"] .error-body {
     background:
         radial-gradient(1100px 680px at -4% -6%, rgba(27, 176, 232, 0.16), transparent 62%),
@@ -135,6 +290,26 @@
 [data-theme="light"] .error-card {
     background: rgba(255, 255, 255, 0.8);
     box-shadow: var(--shadow-lg), 0 0 0 1px rgba(87, 150, 224, 0.15);
+}
+
+[data-theme="light"] .error-status {
+    background: rgba(245, 250, 255, 0.9);
+    border-color: rgba(112, 157, 224, 0.36);
+}
+
+[data-theme="light"] .error-status__label {
+    color: rgba(34, 75, 133, 0.96);
+}
+
+[data-theme="light"] .error-icon-ring {
+    border-color: rgba(121, 164, 230, 0.33);
+    background: radial-gradient(circle, rgba(111, 181, 235, 0.16), transparent 68%);
+}
+
+[data-theme="light"] .error-icon {
+    background: rgba(244, 249, 255, 0.92);
+    border-color: rgba(126, 170, 235, 0.5);
+    color: rgba(48, 83, 140, 0.96);
 }
 
 @media (max-width: 640px) {
