@@ -782,6 +782,25 @@
         });
     }
 
+    function resolveMediaAccessErrorText(error) {
+        if (window.isSecureContext === false) {
+            return "Для звонков нужен HTTPS";
+        }
+
+        const name = String(error?.name || "").toLowerCase();
+        if (name === "notallowederror" || name === "permissiondeniederror" || name === "securityerror") {
+            return "Нет доступа к микрофону/камере. Разрешите доступ в настройках приложения";
+        }
+        if (name === "notfounderror" || name === "devicesnotfounderror") {
+            return "Микрофон или камера не найдены";
+        }
+        if (name === "notreadableerror" || name === "trackstarterror") {
+            return "Микрофон/камера заняты другим приложением";
+        }
+
+        return "Нет доступа к микрофону/камере";
+    }
+
     async function setRemoteDescriptionSafe(connection, description) {
         if (!description) {
             throw new Error("Missing remote description");
@@ -870,7 +889,8 @@
         try {
             localStream = await acquireLocalStream(kind);
         } catch (error) {
-            helpers.showToast("\u041d\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u0430 \u043a \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d\u0443/\u043a\u0430\u043c\u0435\u0440\u0435");
+            console.warn("failed to access media devices", error);
+            helpers.showToast(resolveMediaAccessErrorText(error));
             return;
         }
 
