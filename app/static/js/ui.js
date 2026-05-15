@@ -483,7 +483,12 @@ function setMessagesLoading(loading) {
 }
 
 function bindBaseEvents(app) {
-    refs.logoutBtn.addEventListener("click", () => {
+    refs.logoutBtn.addEventListener("click", async () => {
+        try {
+            await app.api.logout();
+        } catch (_error) {
+            // Ignore network/logout errors and always clear local auth state.
+        }
         window.AppStorage.clearAuth();
         window.location.href = "/login";
     });

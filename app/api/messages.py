@@ -7,11 +7,12 @@ import secrets
 import shutil
 import time
 
-from flask import Blueprint, current_app, jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask import Blueprint, current_app, jsonify, request, send_file
+from flask_jwt_extended import get_jwt_identity, jwt_required, verify_jwt_in_request
 
 from app.extensions import socketio
-from app.models import Chat, ChatMembership, Message
+from app.models import Chat, ChatMembership, Message, MessageAttachment
+from app.security.attachment_access import get_attachment_user_id_from_cookie
 from app.services import ChatService, MessageService, PushService
 from app.utils import (
     generate_image_preview,
@@ -24,6 +25,7 @@ from app.utils import (
 messages_bp = Blueprint("messages", __name__, url_prefix="/messages")
 UPLOAD_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 PREVIEW_SUFFIX = "__preview.webp"
+STORED_NAME_PATTERN = re.compile(r"^[a-f0-9]{32}\.[a-z0-9]{1,16}$")
 
 
 def _attachment_kind_for_name(safe_name: str):
@@ -34,6 +36,36 @@ def _attachment_kind_for_name(safe_name: str):
     if ext in current_app.config["ALLOWED_FILE_EXTENSIONS"]:
         return "file"
     return None
+
+
+def _resolve_upload_path(stored_name: str):
+    primary = current_app.config["FILE_UPLOAD_FOLDER"] / stored_name
+    if primary.exists():
+        return primary
+
+    legacy_root = current_app.config.get("LEGACY_FILE_UPLOAD_FOLDER")
+    if legacy_root:
+        legacy = legacy_root / stored_name
+        if legacy.exists():
+            return legacy
+
+    return None
+
+
+def _resolve_attachment_user_id() -> int | None:
+    cookie_uid = get_attachment_user_id_from_cookie()
+    if cookie_uid:
+        return cookie_uid
+
+    try:
+        verify_jwt_in_request(optional=True)
+        identity = get_jwt_identity()
+        if identity is None:
+            return None
+        parsed = int(identity)
+        return parsed if parsed > 0 else None
+    except Exception:
+        return None
 
 
 def _store_uploaded_files(files):
@@ -62,7 +94,7 @@ def _store_uploaded_files(files):
             {
                 "file_name": safe_name,
                 "stored_name": stored_name,
-                "file_url": f"/static/uploads/files/{stored_name}",
+                "file_url": f"/api/messages/attachments/{stored_name}",
                 "mime_type": file.mimetype or "application/octet-stream",
                 "file_size": file_size,
                 "kind": kind,
@@ -294,7 +326,7 @@ def _consume_chunk_uploads(upload_ids, user_id: int, chat_id: int):
             {
                 "file_name": file_name,
                 "stored_name": stored_name,
-                "file_url": f"/static/uploads/files/{stored_name}",
+                "file_url": f"/api/messages/attachments/{stored_name}",
                 "mime_type": mime_type,
                 "file_size": final_size,
                 "kind": "image" if kind == "image" else "file",
@@ -315,6 +347,63 @@ def _broadcast_chat_update(chat_id: int):
             {"chat": chat_payload},
             room=f"user_{membership.user_id}",
         )
+
+
+@messages_bp.get("/attachments/<string:stored_name>")
+def get_attachment(stored_name: str):
+    user_id = _resolve_attachment_user_id()
+    if not user_id:
+        return jsonify({"error": "Требуется авторизация"}), 401
+
+    normalized = (stored_name or "").strip().lower()
+    if not STORED_NAME_PATTERN.fullmatch(normalized):
+        return jsonify({"error": "Файл не найден"}), 404
+
+    attachment = (
+        MessageAttachment.query
+        .join(Message, Message.id == MessageAttachment.message_id)
+        .filter(MessageAttachment.stored_name == normalized)
+        .first()
+    )
+    if not attachment or not attachment.message:
+        return jsonify({"error": "Файл не найден"}), 404
+
+    membership = ChatMembership.query.filter_by(chat_id=attachment.message.chat_id, user_id=user_id).first()
+    if not membership:
+        return jsonify({"error": "Доступ к файлу запрещен"}), 403
+
+    requested_preview = str(request.args.get("preview") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+    serving_preview = requested_preview and attachment.kind == "image"
+
+    serving_name = attachment.stored_name
+    mimetype = attachment.mime_type or "application/octet-stream"
+    if serving_preview:
+        preview_name = _preview_stored_name(attachment.stored_name)
+        preview_path = _resolve_upload_path(preview_name)
+        if preview_path is None:
+            original_path = _resolve_upload_path(attachment.stored_name)
+            if original_path is not None:
+                generated = generate_image_preview(
+                    source_path=original_path,
+                    preview_path=original_path.parent / preview_name,
+                    max_side=int(current_app.config.get("IMAGE_PREVIEW_MAX_SIDE", 720)),
+                    quality=int(current_app.config.get("IMAGE_PREVIEW_WEBP_QUALITY", 68)),
+                )
+                if generated:
+                    preview_path = _resolve_upload_path(preview_name)
+
+        if preview_path is not None:
+            serving_name = preview_name
+            mimetype = "image/webp"
+
+    target_path = _resolve_upload_path(serving_name)
+    if target_path is None or not target_path.exists():
+        return jsonify({"error": "Файл не найден"}), 404
+
+    response = send_file(target_path, mimetype=mimetype, conditional=True)
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 @messages_bp.post("/uploads/init")

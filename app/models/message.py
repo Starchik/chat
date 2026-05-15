@@ -116,22 +116,31 @@ class MessageAttachment(db.Model):
 
     message = db.relationship("Message", back_populates="attachments")
 
+    def _secure_attachment_url(self, preview: bool = False):
+        if not self.stored_name:
+            return self.file_url
+
+        base = f"/api/messages/attachments/{self.stored_name}"
+        if preview and self.kind == "image":
+            return f"{base}?preview=1"
+        return base
+
     def _resolve_preview_url(self):
         if self.kind != "image" or not self.stored_name:
-            return self.file_url
+            return self._secure_attachment_url()
 
         preview_name = preview_storage_name(self.stored_name)
         if not preview_name:
-            return self.file_url
+            return self._secure_attachment_url()
 
         try:
             uploads_dir = current_app.config.get("FILE_UPLOAD_FOLDER")
             if uploads_dir is None:
-                return self.file_url
+                return self._secure_attachment_url()
 
             preview_path = uploads_dir / preview_name
             if preview_path.exists():
-                return f"/static/uploads/files/{preview_name}"
+                return self._secure_attachment_url(preview=True)
 
             original_path = uploads_dir / self.stored_name
             generated = generate_image_preview(
@@ -141,11 +150,11 @@ class MessageAttachment(db.Model):
                 quality=int(current_app.config.get("IMAGE_PREVIEW_WEBP_QUALITY", 68)),
             )
             if generated and preview_path.exists():
-                return f"/static/uploads/files/{preview_name}"
+                return self._secure_attachment_url(preview=True)
         except Exception:
-            return self.file_url
+            return self._secure_attachment_url()
 
-        return self.file_url
+        return self._secure_attachment_url()
 
     def to_dict(self):
         return {
@@ -154,7 +163,7 @@ class MessageAttachment(db.Model):
             "uploader_id": self.uploader_id,
             "file_name": self.file_name,
             "stored_name": self.stored_name,
-            "file_url": self.file_url,
+            "file_url": self._secure_attachment_url(),
             "preview_url": self._resolve_preview_url(),
             "mime_type": self.mime_type,
             "file_size": self.file_size,

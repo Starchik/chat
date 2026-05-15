@@ -130,6 +130,10 @@
             return apiRequest("/auth/me", { method: "GET" });
         },
 
+        logout() {
+            return apiRequest("/auth/logout", { method: "POST" });
+        },
+
         uploadAvatar(file) {
             const formData = new FormData();
             formData.append("avatar", file);

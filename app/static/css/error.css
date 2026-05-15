@@ -1,0 +1,159 @@
+.error-body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    color: var(--text);
+    background:
+        radial-gradient(1100px 680px at -4% -6%, rgba(70, 212, 255, 0.19), transparent 62%),
+        radial-gradient(980px 620px at 106% -8%, rgba(125, 139, 255, 0.2), transparent 64%),
+        radial-gradient(900px 700px at 50% 116%, rgba(82, 242, 202, 0.14), transparent 66%),
+        var(--bg);
+    overflow: hidden;
+}
+
+.error-shell {
+    position: relative;
+    z-index: 2;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 1.2rem;
+}
+
+.error-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.error-bg__orb {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(2px);
+    opacity: 0.7;
+}
+
+.error-bg__orb--one {
+    width: 420px;
+    height: 420px;
+    left: -120px;
+    top: -120px;
+    background: radial-gradient(circle, rgba(90, 205, 255, 0.35), transparent 70%);
+}
+
+.error-bg__orb--two {
+    width: 500px;
+    height: 500px;
+    right: -140px;
+    top: -90px;
+    background: radial-gradient(circle, rgba(129, 144, 255, 0.32), transparent 72%);
+}
+
+.error-bg__orb--three {
+    width: 520px;
+    height: 520px;
+    left: 50%;
+    bottom: -280px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(84, 238, 200, 0.23), transparent 72%);
+}
+
+.error-card {
+    position: relative;
+    width: min(100%, 640px);
+    border-radius: 28px;
+    border: 1px solid var(--line-strong);
+    background: rgba(12, 18, 33, 0.72);
+    backdrop-filter: blur(var(--blur-lg));
+    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(140, 206, 255, 0.12);
+    padding: 2rem 1.7rem;
+    text-align: center;
+}
+
+.error-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.11), transparent 58%);
+    pointer-events: none;
+}
+
+.error-code {
+    font-size: clamp(3rem, 16vw, 7rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.8rem;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 8px 30px rgba(73, 197, 255, 0.23);
+}
+
+.error-title {
+    margin: 0;
+    font-size: clamp(1.25rem, 3.3vw, 1.85rem);
+    line-height: 1.25;
+}
+
+.error-message {
+    margin: 0.8rem auto 0;
+    max-width: 52ch;
+    color: var(--text-secondary);
+    font-size: 0.94rem;
+    line-height: 1.55;
+}
+
+.error-hint {
+    margin: 0.72rem auto 0;
+    max-width: 56ch;
+    color: var(--text-tertiary);
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+.error-actions {
+    margin-top: 1.35rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+[data-theme="light"] .error-body {
+    background:
+        radial-gradient(1100px 680px at -4% -6%, rgba(27, 176, 232, 0.16), transparent 62%),
+        radial-gradient(980px 620px at 106% -8%, rgba(95, 94, 236, 0.14), transparent 64%),
+        radial-gradient(900px 700px at 50% 116%, rgba(45, 205, 161, 0.12), transparent 66%),
+        var(--bg);
+}
+
+[data-theme="light"] .error-card {
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(87, 150, 224, 0.15);
+}
+
+@media (max-width: 640px) {
+    .error-shell {
+        padding: 0.72rem;
+    }
+
+    .error-card {
+        border-radius: 22px;
+        padding: 1.5rem 1rem;
+    }
+
+    .error-actions {
+        display: grid;
+        width: 100%;
+        gap: 0.52rem;
+    }
+
+    .error-actions .btn {
+        width: 100%;
+    }
+}

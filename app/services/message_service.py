@@ -202,7 +202,7 @@ class MessageService:
                     {
                         "file_name": attachment.file_name,
                         "stored_name": new_stored_name,
-                        "file_url": f"/static/uploads/files/{new_stored_name}",
+                        "file_url": f"/api/messages/attachments/{new_stored_name}",
                         "mime_type": attachment.mime_type,
                         "file_size": file_size,
                         "kind": attachment.kind,

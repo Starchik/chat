@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>{{ status_code }} · {{ title }}</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
+
+    <link rel="stylesheet" href="{{ asset_url('css/variables.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/components.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/error.css') }}" />
+
+    <script>
+        (function () {
+            const saved = localStorage.getItem("theme");
+            const theme = saved || "dark";
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+</head>
+<body class="error-body">
+    <div class="error-bg" aria-hidden="true">
+        <div class="error-bg__orb error-bg__orb--one"></div>
+        <div class="error-bg__orb error-bg__orb--two"></div>
+        <div class="error-bg__orb error-bg__orb--three"></div>
+    </div>
+
+    <main class="error-shell">
+        <section class="error-card">
+            <div class="error-code">{{ status_code }}</div>
+            <h1 class="error-title">{{ title }}</h1>
+            <p class="error-message">{{ message }}</p>
+            {% if hint %}
+            <p class="error-hint">{{ hint }}</p>
+            {% endif %}
+
+            <div class="error-actions">
+                <a class="btn btn-primary" href="/">
+                    <i class="fa-solid fa-house"></i>
+                    <span>На главную</span>
+                </a>
+                <button class="btn btn-soft" type="button" onclick="window.history.back()">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Назад</span>
+                </button>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

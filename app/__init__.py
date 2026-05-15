@@ -4,7 +4,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, url_for
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from app.api import register_api
 from app.config import Config
@@ -105,6 +105,61 @@ def create_app():
     def health():
         return {"status": "ok"}
 
+    error_page_meta = {
+        401: {
+            "title": "Требуется авторизация",
+            "message": "Для доступа к этой странице нужно войти в аккаунт.",
+            "hint": "Проверьте, что вы авторизованы, и попробуйте открыть страницу снова.",
+        },
+        403: {
+            "title": "Доступ запрещен",
+            "message": "У вас нет прав для просмотра этой страницы или ресурса.",
+            "hint": "Если это ошибка, обратитесь к администратору или владельцу чата.",
+        },
+        404: {
+            "title": "Страница не найдена",
+            "message": "Запрошенный адрес не существует или уже был удален.",
+            "hint": "Проверьте ссылку или перейдите на главную страницу.",
+        },
+        413: {
+            "title": "Файл слишком большой",
+            "message": "Размер запроса превышает допустимый лимит сервера.",
+            "hint": "Для больших файлов используйте загрузку частями.",
+        },
+        500: {
+            "title": "Ошибка сервера",
+            "message": "На сервере произошла внутренняя ошибка.",
+            "hint": "Попробуйте обновить страницу немного позже.",
+        },
+    }
+
+    def _is_api_request() -> bool:
+        path = (request.path or "").lower()
+        if path.startswith("/api/"):
+            return True
+
+        accept = (request.headers.get("Accept") or "").lower()
+        return "application/json" in accept and "text/html" not in accept
+
+    def _render_error_page(status_code: int, message_override: str | None = None):
+        meta = error_page_meta.get(status_code)
+        if not meta:
+            meta = {
+                "title": f"Ошибка {status_code}",
+                "message": "Произошла ошибка при обработке запроса.",
+                "hint": "Проверьте адрес страницы или попробуйте выполнить действие позже.",
+            }
+        return (
+            render_template(
+                "error.html",
+                status_code=status_code,
+                title=meta["title"],
+                message=message_override or meta["message"],
+                hint=meta["hint"],
+            ),
+            status_code,
+        )
+
     @app.after_request
     def add_cache_headers(response):
         path = request.path or ""
@@ -121,6 +176,12 @@ def create_app():
 
         return response
 
+    @app.before_request
+    def block_public_uploaded_files():
+        path = request.path or ""
+        if path.startswith("/static/uploads/files/"):
+            return "", 404
+
     @app.errorhandler(RequestEntityTooLarge)
     def handle_request_entity_too_large(_error):
         max_length = int(app.config.get("MAX_CONTENT_LENGTH", 0))
@@ -130,9 +191,28 @@ def create_app():
             "Повторите отправку через загрузку частями."
         )
 
-        if (request.path or "").startswith("/api/"):
+        if _is_api_request():
             return jsonify({"error": message}), 413
 
-        return message, 413
+        return _render_error_page(413, message_override=message)
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(error: HTTPException):
+        status_code = int(error.code or 500)
+
+        if _is_api_request():
+            default_message = error_page_meta.get(status_code, error_page_meta[500])["message"]
+            return jsonify({"error": default_message}), status_code
+
+        return _render_error_page(status_code)
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(error: Exception):
+        app.logger.exception("Unhandled server error", exc_info=error)
+
+        if _is_api_request():
+            return jsonify({"error": error_page_meta[500]["message"]}), 500
+
+        return _render_error_page(500)
 
     return app

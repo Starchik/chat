@@ -1,8 +1,9 @@
-﻿from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, make_response, request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 
 from app.extensions import db
 from app.models import User
+from app.security.attachment_access import clear_attachment_cookie, issue_attachment_cookie
 from app.utils import (
     is_allowed_file,
     make_storage_filename,
@@ -21,6 +22,12 @@ def _token_response(user):
     }
 
 
+def _auth_success_response(user, status_code: int = 200):
+    response = make_response(jsonify(_token_response(user)), status_code)
+    issue_attachment_cookie(response, user.id)
+    return response
+
+
 @auth_bp.post("/register")
 def register():
     data = request.get_json(silent=True) or {}
@@ -31,21 +38,21 @@ def register():
     display_name = (data.get("display_name") or username).strip()
 
     if len(username) < 3 or len(username) > 32:
-        return jsonify({"error": "Username должен быть от 3 до 32 символов"}), 400
+        return jsonify({"error": "Username must be 3..32 chars"}), 400
     if "@" not in email or len(email) > 320:
-        return jsonify({"error": "Некорректный email"}), 400
+        return jsonify({"error": "Invalid email"}), 400
     if len(password) < 6:
-        return jsonify({"error": "Пароль должен быть минимум 6 символов"}), 400
+        return jsonify({"error": "Password must be at least 6 chars"}), 400
     if len(display_name) < 2:
-        return jsonify({"error": "Display name должен быть минимум 2 символа"}), 400
+        return jsonify({"error": "Display name must be at least 2 chars"}), 400
 
     existing_username = User.query.filter_by(username=username).first()
     if existing_username:
-        return jsonify({"error": "Username уже занят"}), 409
+        return jsonify({"error": "Username already in use"}), 409
 
     existing_email = User.query.filter_by(email=email).first()
     if existing_email:
-        return jsonify({"error": "Email уже зарегистрирован"}), 409
+        return jsonify({"error": "Email already registered"}), 409
 
     user = User(
         username=username,
@@ -57,7 +64,7 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    return jsonify(_token_response(user)), 201
+    return _auth_success_response(user, status_code=201)
 
 
 @auth_bp.post("/login")
@@ -68,16 +75,16 @@ def login():
     password = data.get("password") or ""
 
     if not login_value or not password:
-        return jsonify({"error": "Введите логин и пароль"}), 400
+        return jsonify({"error": "Provide login and password"}), 400
 
     user = User.query.filter(
         (User.username == login_value) | (User.email == login_value)
     ).first()
 
     if not user or not user.check_password(password):
-        return jsonify({"error": "Неверные учетные данные"}), 401
+        return jsonify({"error": "Invalid credentials"}), 401
 
-    return jsonify(_token_response(user))
+    return _auth_success_response(user)
 
 
 @auth_bp.get("/me")
@@ -86,8 +93,18 @@ def me():
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
-        return jsonify({"error": "Пользователь не найден"}), 404
-    return jsonify({"user": user.to_dict()})
+        return jsonify({"error": "User not found"}), 404
+
+    response = jsonify({"user": user.to_dict()})
+    issue_attachment_cookie(response, user.id)
+    return response
+
+
+@auth_bp.post("/logout")
+def logout():
+    response = jsonify({"ok": True})
+    clear_attachment_cookie(response)
+    return response
 
 
 @auth_bp.post("/avatar")
@@ -96,17 +113,17 @@ def upload_avatar():
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
-        return jsonify({"error": "Пользователь не найден"}), 404
+        return jsonify({"error": "User not found"}), 404
 
     if "avatar" not in request.files:
-        return jsonify({"error": "Файл avatar не передан"}), 400
+        return jsonify({"error": "Avatar file is missing"}), 400
 
     avatar = request.files["avatar"]
     if not avatar.filename:
-        return jsonify({"error": "Пустое имя файла"}), 400
+        return jsonify({"error": "Empty filename"}), 400
 
     if not is_allowed_file(avatar.filename, current_app.config["ALLOWED_IMAGE_EXTENSIONS"]):
-        return jsonify({"error": "Неподдерживаемый формат изображения"}), 400
+        return jsonify({"error": "Unsupported image format"}), 400
 
     safe_name = sanitize_filename(avatar.filename)
     stored_name = make_storage_filename(safe_name)

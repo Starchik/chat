@@ -155,7 +155,8 @@ class Config:
     TEMPLATES_AUTO_RELOAD = True
     SEND_FILE_MAX_AGE_DEFAULT = 0
 
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=int(os.getenv("JWT_EXPIRES_DAYS", "7")))
+    JWT_EXPIRES_DAYS = int(os.getenv("JWT_EXPIRES_DAYS", "7"))
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=JWT_EXPIRES_DAYS)
     JWT_TOKEN_LOCATION = ["headers"]
 
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(20 * 1024 * 1024)))
@@ -174,7 +175,22 @@ class Config:
     UPLOAD_BASE_FOLDER = BASE_DIR / "app" / "static" / "uploads"
     AVATAR_UPLOAD_FOLDER = UPLOAD_BASE_FOLDER / "avatars"
     FILE_UPLOAD_FOLDER = UPLOAD_BASE_FOLDER / "files"
+    LEGACY_FILE_UPLOAD_FOLDER = UPLOAD_BASE_FOLDER / "files"
     CHUNK_UPLOAD_FOLDER = INSTANCE_DIR / "chunk_uploads"
+
+    ATTACHMENT_AUTH_COOKIE_NAME = os.getenv("ATTACHMENT_AUTH_COOKIE_NAME", "chat_attachment_auth")
+    ATTACHMENT_AUTH_COOKIE_PATH = os.getenv("ATTACHMENT_AUTH_COOKIE_PATH", "/api/messages/attachments")
+    ATTACHMENT_AUTH_MAX_AGE = int(
+        os.getenv(
+            "ATTACHMENT_AUTH_MAX_AGE",
+            str(JWT_EXPIRES_DAYS * 24 * 60 * 60),
+        )
+    )
+    ATTACHMENT_AUTH_SECURE = _env_bool("ATTACHMENT_AUTH_SECURE", False)
+    ATTACHMENT_AUTH_SAMESITE = os.getenv("ATTACHMENT_AUTH_SAMESITE", "Lax")
+    ATTACHMENT_AUTH_DOMAIN = (os.getenv("ATTACHMENT_AUTH_DOMAIN") or "").strip() or None
+    ATTACHMENT_AUTH_SECRET = os.getenv("ATTACHMENT_AUTH_SECRET", SECRET_KEY)
+    ATTACHMENT_AUTH_SALT = os.getenv("ATTACHMENT_AUTH_SALT", "chat-attachment-auth")
 
     VAPID_PRIVATE_KEY_PATH = os.getenv(
         "VAPID_PRIVATE_KEY_PATH",
