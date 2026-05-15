@@ -150,10 +150,17 @@ def create_app():
 
     def _is_api_request() -> bool:
         path = (request.path or "").lower()
+        accept = (request.headers.get("Accept") or "").lower()
+        fetch_dest = (request.headers.get("Sec-Fetch-Dest") or "").lower()
+        wants_html = "text/html" in accept or fetch_dest in {"document", "iframe"}
+
+        # Allow pretty HTML error pages for direct browser opens of protected attachments.
+        if path.startswith("/api/messages/attachments/") and wants_html:
+            return False
+
         if path.startswith("/api/"):
             return True
 
-        accept = (request.headers.get("Accept") or "").lower()
         return "application/json" in accept and "text/html" not in accept
 
     def _render_error_page(status_code: int, message_override: str | None = None):

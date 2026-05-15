@@ -7,7 +7,7 @@ import secrets
 import shutil
 import time
 
-from flask import Blueprint, current_app, jsonify, request, send_file
+from flask import Blueprint, abort, current_app, jsonify, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required, verify_jwt_in_request
 
 from app.extensions import socketio
@@ -66,6 +66,17 @@ def _resolve_attachment_user_id() -> int | None:
         return parsed if parsed > 0 else None
     except Exception:
         return None
+
+
+def _attachment_error_response(status_code: int, message: str):
+    accept = (request.headers.get("Accept") or "").lower()
+    fetch_dest = (request.headers.get("Sec-Fetch-Dest") or "").lower()
+    wants_html = "text/html" in accept or fetch_dest in {"document", "iframe"}
+
+    if wants_html:
+        abort(status_code)
+
+    return jsonify({"error": message}), status_code
 
 
 def _store_uploaded_files(files):
@@ -353,11 +364,11 @@ def _broadcast_chat_update(chat_id: int):
 def get_attachment(stored_name: str):
     user_id = _resolve_attachment_user_id()
     if not user_id:
-        return jsonify({"error": "Требуется авторизация"}), 401
+        return _attachment_error_response(401, "Требуется авторизация")
 
     normalized = (stored_name or "").strip().lower()
     if not STORED_NAME_PATTERN.fullmatch(normalized):
-        return jsonify({"error": "Файл не найден"}), 404
+        return _attachment_error_response(404, "Файл не найден")
 
     attachment = (
         MessageAttachment.query
@@ -366,11 +377,11 @@ def get_attachment(stored_name: str):
         .first()
     )
     if not attachment or not attachment.message:
-        return jsonify({"error": "Файл не найден"}), 404
+        return _attachment_error_response(404, "Файл не найден")
 
     membership = ChatMembership.query.filter_by(chat_id=attachment.message.chat_id, user_id=user_id).first()
     if not membership:
-        return jsonify({"error": "Доступ к файлу запрещен"}), 403
+        return _attachment_error_response(403, "Доступ к файлу запрещен")
 
     requested_preview = str(request.args.get("preview") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
     serving_preview = requested_preview and attachment.kind == "image"
@@ -398,7 +409,7 @@ def get_attachment(stored_name: str):
 
     target_path = _resolve_upload_path(serving_name)
     if target_path is None or not target_path.exists():
-        return jsonify({"error": "Файл не найден"}), 404
+        return _attachment_error_response(404, "Файл не найден")
 
     response = send_file(target_path, mimetype=mimetype, conditional=True)
     response.headers["Cache-Control"] = "private, no-store"
