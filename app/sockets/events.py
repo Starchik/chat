@@ -471,7 +471,12 @@ def socket_call_invite(data=None):
         )
         return
 
-    if not user_to_sids.get(target_user_id):
+    target_online = bool(user_to_sids.get(target_user_id))
+    if not target_online:
+        target_user = User.query.get(target_user_id)
+        target_online = bool(target_user and target_user.is_online)
+
+    if not target_online:
         _log_call_message(
             {
                 "session_id": session_id,

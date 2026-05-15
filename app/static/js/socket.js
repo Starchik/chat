@@ -95,6 +95,10 @@
         socket.emit(eventName, payload);
     }
 
+    function emitPresencePingSafe() {
+        emitSafe("presence_ping");
+    }
+
     function connect() {
         if (typeof io === "undefined") {
             helpers.showToast("Realtime недоступен: Socket.IO не загружен");
@@ -117,7 +121,7 @@
             connectErrorCount = 0;
             warnedConnectionFailure = false;
             clearConnectionIssueTimer();
-            emitSafe("presence_ping");
+            emitPresencePingSafe();
             startPresenceTimer();
 
             if (state.currentChatId) {
@@ -218,6 +222,15 @@
         socket.on("call_error", (payload) => {
             deps.calls?.onSocketCallError(payload || {});
         });
+
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                emitPresencePingSafe();
+            }
+        });
+
+        window.addEventListener("focus", emitPresencePingSafe);
+        window.addEventListener("chatapp:presence-ping", emitPresencePingSafe);
     }
 
     function joinChat(chatId) {
