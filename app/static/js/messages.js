@@ -138,7 +138,16 @@
     function autoResizeInput() {
         refs.messageInput.style.height = "auto";
         const maxHeight = 170;
-        const minHeight = 44;
+        const computedMinHeight = parseFloat(window.getComputedStyle(refs.messageInput).minHeight);
+        const minHeight = Number.isFinite(computedMinHeight) && computedMinHeight > 0 ? computedMinHeight : 44;
+        const isEmpty = refs.messageInput.value.trim().length === 0;
+
+        if (isEmpty) {
+            refs.messageInput.style.height = `${minHeight}px`;
+            refs.messageInput.style.overflowY = "hidden";
+            return;
+        }
+
         const needsScroll = refs.messageInput.scrollHeight > maxHeight;
         const nextHeight = Math.min(refs.messageInput.scrollHeight, maxHeight);
         refs.messageInput.style.height = `${Math.max(nextHeight, minHeight)}px`;
@@ -2287,6 +2296,11 @@
         }
     }
 
+    function updateMessageInputPlaceholder() {
+        const mobile = window.matchMedia("(max-width: 560px)").matches;
+        refs.messageInput.placeholder = mobile ? "Сообщение..." : "Введите сообщение...";
+    }
+
     function bindContextMenuActions() {
         refs.contextMenu.addEventListener("click", async (event) => {
             const button = event.target.closest("button[data-action]");
@@ -2371,7 +2385,7 @@
     }
 
     function bindEvents() {
-        refs.messageInput.placeholder = "Введите сообщение...";
+        updateMessageInputPlaceholder();
 
         refs.sendBtn.addEventListener("click", () => {
             void sendMessage();
@@ -2474,6 +2488,7 @@
             }
         });
         window.addEventListener("focus", syncCurrentChatRead);
+        window.addEventListener("resize", updateMessageInputPlaceholder);
 
         bindContextMenuActions();
         bindEmojiPanel();
