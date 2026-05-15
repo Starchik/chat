@@ -277,3 +277,22 @@ Env knobs:
 - Replacing an avatar now removes the previous avatar file from `app/static/uploads/avatars` (best-effort cleanup).
 - Docker services use json-file log rotation (`max-size=10m`, `max-file=5`) to limit disk growth.
 
+## Interactive Ubuntu installer
+
+For a clean Ubuntu server you can run an interactive setup wizard:
+
+```bash
+chmod +x scripts/install_ubuntu.sh
+./scripts/install_ubuntu.sh
+```
+
+What it does:
+- verifies Ubuntu environment
+- installs Docker Engine + Compose plugin if missing
+- prepares/updates `.env` (domain, email, secrets, TURN settings)
+- lets you choose deploy mode:
+1. full public stack (`messenger + caddy + coturn`)
+2. cloudflared mode (`messenger` on `127.0.0.1:5000`, optional cloudflared service setup)
+- starts containers and runs a local health check
+
+For cloudflared mode you need a Cloudflare Tunnel token and DNS record for your domain.
