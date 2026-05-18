@@ -116,7 +116,7 @@ get_env_value() {
     return
   fi
 
-  grep -E "^${key}=" "${file}" | tail -n 1 | cut -d '=' -f2-
+  grep -E "^${key}=" "${file}" | tail -n 1 | cut -d '=' -f2- || true
 }
 
 upsert_env() {
