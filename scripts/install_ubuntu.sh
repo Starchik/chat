@@ -63,6 +63,22 @@ prompt() {
   printf '%s' "${answer}"
 }
 
+normalize_answer() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
+}
+
+is_yes_answer() {
+  local answer="$1"
+  case "${answer}" in
+    y | yes | 1 | true)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 confirm_yes() {
   local label="$1"
   local default_yes="${2:-1}"
@@ -74,14 +90,14 @@ confirm_yes() {
   fi
 
   read -r -p "${label} (${marker}): " answer
-  answer="$(printf '%s' "${answer}" | tr '[:upper:]' '[:lower:]')"
+  answer="$(normalize_answer "${answer}")"
 
   if [[ -z "${answer}" ]]; then
     [[ "${default_yes}" == "1" ]]
     return
   fi
 
-  [[ "${answer}" == "y" || "${answer}" == "yes" ]]
+  is_yes_answer "${answer}"
 }
 
 random_token() {
@@ -179,12 +195,47 @@ ubuntu_guard() {
   [[ "${ID:-}" == "ubuntu" ]] || fail "This installer targets Ubuntu only (detected: ${ID:-unknown})."
 }
 
+ensure_valid_port() {
+  local port="$1"
+  [[ "${port}" =~ ^[0-9]+$ ]] || fail "Port must be a number (got: ${port})."
+  ((port >= 1 && port <= 65535)) || fail "Port must be between 1 and 65535 (got: ${port})."
+}
+
+is_port_busy() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn "sport = :${port}" 2>/dev/null | tail -n +2 | grep -q .
+    return
+  fi
+
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$" {found=1} END {exit(found ? 0 : 1)}'
+    return
+  fi
+
+  return 1
+}
+
+show_port_holders() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    as_root ss -ltnp "sport = :${port}" || true
+    return
+  fi
+
+  if command -v netstat >/dev/null 2>&1; then
+    as_root netstat -ltnp 2>/dev/null | grep ":${port}" || true
+  fi
+}
+
 write_cloudflared_override() {
-  cat >"${CF_OVERRIDE_FILE}" <<'YAML'
+  local local_port="${1:-5000}"
+
+  cat >"${CF_OVERRIDE_FILE}" <<YAML
 services:
   messenger:
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:${local_port}:5000"
 YAML
 }
 
@@ -241,6 +292,18 @@ if [[ "${MODE_CHOICE}" != "1" && "${MODE_CHOICE}" != "2" ]]; then
   fail "Unknown choice: ${MODE_CHOICE}"
 fi
 
+CF_LOCAL_PORT="5000"
+if [[ "${MODE_CHOICE}" == "2" ]]; then
+  existing_cf_local_port="$(get_env_value CLOUDFLARED_LOCAL_PORT "${ENV_FILE}")"
+  if [[ -n "${existing_cf_local_port}" ]]; then
+    CF_LOCAL_PORT="${existing_cf_local_port}"
+  fi
+
+  CF_LOCAL_PORT="$(prompt "Local host port for messenger in cloudflared mode" "${CF_LOCAL_PORT}")"
+  CF_LOCAL_PORT="$(normalize_answer "${CF_LOCAL_PORT}")"
+  ensure_valid_port "${CF_LOCAL_PORT}"
+fi
+
 SECRET_KEY="$(get_env_value SECRET_KEY "${ENV_FILE}")"
 JWT_SECRET_KEY="$(get_env_value JWT_SECRET_KEY "${ENV_FILE}")"
 TURN_CREDENTIAL="$(get_env_value WEBRTC_TURN_CREDENTIAL "${ENV_FILE}")"
@@ -295,15 +358,26 @@ upsert_env SOCKETIO_ASYNC_MODE "threading" "${ENV_FILE}"
 upsert_env SOCKETIO_FORCE_EVENTLET "0" "${ENV_FILE}"
 upsert_env APP_SERVER "gunicorn" "${ENV_FILE}"
 upsert_env ATTACHMENT_AUTH_SECURE "1" "${ENV_FILE}"
+if [[ "${MODE_CHOICE}" == "2" ]]; then
+  upsert_env CLOUDFLARED_LOCAL_PORT "${CF_LOCAL_PORT}" "${ENV_FILE}"
+fi
 
 if [[ "${MODE_CHOICE}" == "1" ]]; then
   rm -f "${CF_OVERRIDE_FILE}"
   log "Starting full public stack..."
   (cd "${REPO_DIR}" && docker compose down && docker compose up -d --build)
 else
-  write_cloudflared_override
+  write_cloudflared_override "${CF_LOCAL_PORT}"
   log "Starting messenger in cloudflared mode..."
-  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml down && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d --build messenger coturn postgres)
+  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml down)
+
+  if is_port_busy "${CF_LOCAL_PORT}"; then
+    warn "Local port 127.0.0.1:${CF_LOCAL_PORT} is already in use."
+    show_port_holders "${CF_LOCAL_PORT}"
+    fail "Free port ${CF_LOCAL_PORT} or rerun installer and choose another local cloudflared port."
+  fi
+
+  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d --build messenger coturn postgres)
 
   if confirm_yes "Install/configure cloudflared service now?" 1; then
     install_cloudflared_if_needed
@@ -314,7 +388,7 @@ else
     as_root systemctl restart cloudflared
     log "cloudflared service installed and restarted."
   else
-    warn "cloudflared setup skipped. Configure it manually to proxy ${DOMAIN} -> http://127.0.0.1:5000"
+    warn "cloudflared setup skipped. Configure it manually to proxy ${DOMAIN} -> http://127.0.0.1:${CF_LOCAL_PORT}"
   fi
 fi
 
@@ -334,8 +408,13 @@ else
   (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml ps)
 fi
 
-if curl -fsS "http://127.0.0.1:5000/health" >/dev/null 2>&1; then
-  log "Health endpoint is OK: http://127.0.0.1:5000/health"
+HEALTH_PORT="5000"
+if [[ "${MODE_CHOICE}" == "2" ]]; then
+  HEALTH_PORT="${CF_LOCAL_PORT}"
+fi
+
+if curl -fsS "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1; then
+  log "Health endpoint is OK: http://127.0.0.1:${HEALTH_PORT}/health"
 else
   warn "Health endpoint check failed. Inspect logs:"
   if [[ "${MODE_CHOICE}" == "1" ]]; then
@@ -351,7 +430,7 @@ if [[ "${MODE_CHOICE}" == "1" ]]; then
 else
   echo
   echo "Cloudflared mode is active."
-  echo "Make sure tunnel ingress points ${DOMAIN} to http://127.0.0.1:5000"
+  echo "Make sure tunnel ingress points ${DOMAIN} to http://127.0.0.1:${CF_LOCAL_PORT}"
 fi
 
 echo
