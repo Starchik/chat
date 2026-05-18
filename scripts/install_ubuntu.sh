@@ -244,6 +244,9 @@ fi
 SECRET_KEY="$(get_env_value SECRET_KEY "${ENV_FILE}")"
 JWT_SECRET_KEY="$(get_env_value JWT_SECRET_KEY "${ENV_FILE}")"
 TURN_CREDENTIAL="$(get_env_value WEBRTC_TURN_CREDENTIAL "${ENV_FILE}")"
+POSTGRES_DB_VALUE="$(get_env_value POSTGRES_DB "${ENV_FILE}")"
+POSTGRES_USER_VALUE="$(get_env_value POSTGRES_USER "${ENV_FILE}")"
+POSTGRES_PASSWORD_VALUE="$(get_env_value POSTGRES_PASSWORD "${ENV_FILE}")"
 
 if is_placeholder "${SECRET_KEY}"; then
   SECRET_KEY="$(random_token)"
@@ -255,6 +258,18 @@ fi
 
 if is_placeholder "${TURN_CREDENTIAL}"; then
   TURN_CREDENTIAL="$(random_token)"
+fi
+
+if [[ -z "${POSTGRES_DB_VALUE}" ]]; then
+  POSTGRES_DB_VALUE="chat"
+fi
+
+if [[ -z "${POSTGRES_USER_VALUE}" ]]; then
+  POSTGRES_USER_VALUE="chat"
+fi
+
+if [[ -z "${POSTGRES_PASSWORD_VALUE}" ]]; then
+  POSTGRES_PASSWORD_VALUE="$(random_token)"
 fi
 
 if confirm_yes "Use generated random secrets for SECRET_KEY / JWT_SECRET_KEY / WEBRTC_TURN_CREDENTIAL?" 1; then
@@ -272,6 +287,10 @@ upsert_env JWT_SECRET_KEY "${JWT_SECRET_KEY}" "${ENV_FILE}"
 upsert_env WEBRTC_TURN_CREDENTIAL "${TURN_CREDENTIAL}" "${ENV_FILE}"
 upsert_env TURN_REALM "${DOMAIN}" "${ENV_FILE}"
 upsert_env WEBRTC_TURN_URLS "turn:${DOMAIN}:3478?transport=udp,turn:${DOMAIN}:3478?transport=tcp" "${ENV_FILE}"
+upsert_env POSTGRES_DB "${POSTGRES_DB_VALUE}" "${ENV_FILE}"
+upsert_env POSTGRES_USER "${POSTGRES_USER_VALUE}" "${ENV_FILE}"
+upsert_env POSTGRES_PASSWORD "${POSTGRES_PASSWORD_VALUE}" "${ENV_FILE}"
+upsert_env DATABASE_URL "postgresql+psycopg://${POSTGRES_USER_VALUE}:${POSTGRES_PASSWORD_VALUE}@postgres:5432/${POSTGRES_DB_VALUE}" "${ENV_FILE}"
 upsert_env SOCKETIO_ASYNC_MODE "threading" "${ENV_FILE}"
 upsert_env SOCKETIO_FORCE_EVENTLET "0" "${ENV_FILE}"
 upsert_env APP_SERVER "gunicorn" "${ENV_FILE}"
@@ -284,7 +303,7 @@ if [[ "${MODE_CHOICE}" == "1" ]]; then
 else
   write_cloudflared_override
   log "Starting messenger in cloudflared mode..."
-  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml down && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d --build messenger coturn)
+  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml down && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d --build messenger coturn postgres)
 
   if confirm_yes "Install/configure cloudflared service now?" 1; then
     install_cloudflared_if_needed

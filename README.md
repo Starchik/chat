@@ -163,21 +163,14 @@ curl http://127.0.0.1:5000/health
 
 ## Runtime profile in Docker
 
-By default the container starts with Gunicorn + gevent websocket worker via `start.sh`.
+By default the container starts with Gunicorn + `gthread` worker via `start.sh`.
 This avoids relying on Werkzeug in production and improves stability for `/health` and Socket.IO under concurrent load.
 
 Env knobs:
 - `APP_SERVER=gunicorn` (default) or `APP_SERVER=python`
-- `GUNICORN_WORKER_CLASS=geventwebsocket.gunicorn.workers.GeventWebSocketWorker` (default)
 - `GUNICORN_WORKERS=1`
-- `GUNICORN_WORKER_CONNECTIONS=2000`
-- `GUNICORN_TIMEOUT=120`
-- `GUNICORN_GRACEFUL_TIMEOUT=30`
-- `GUNICORN_KEEPALIVE=25`
-
-For classic threaded mode, set:
-- `GUNICORN_WORKER_CLASS=gthread`
 - `GUNICORN_THREADS=100`
+- `GUNICORN_TIMEOUT=120`
 
 If you need old behavior for debugging, set `APP_SERVER=python`.
 
@@ -195,31 +188,17 @@ Apply changes:
 docker compose up -d --build messenger
 ```
 
-## Scalable baseline (PostgreSQL + Redis + gevent)
+## Database backend (PostgreSQL only)
 
-This repository now includes a scalable baseline profile for higher concurrent online load.
+The app works with PostgreSQL only.
 
-### 1) Configure `.env`
-
-Use these key values:
+Required `.env` values:
 
 ```env
 DATABASE_URL=postgresql+psycopg://chat:chat@postgres:5432/chat
-SOCKETIO_ASYNC_MODE=gevent
-SOCKETIO_MESSAGE_QUEUE=redis://redis:6379/0
-SOCKETIO_REDIS_CHANNEL=chat_socketio
-SOCKETIO_STATE_REDIS_URL=redis://redis:6379/1
-PRESENCE_DB_UPDATE_INTERVAL_SEC=120
-APP_SERVER=gunicorn
-GUNICORN_WORKER_CLASS=geventwebsocket.gunicorn.workers.GeventWebSocketWorker
-GUNICORN_WORKERS=1
-GUNICORN_WORKER_CONNECTIONS=2000
-```
-
-Quick path (prebuilt env):
-
-```bash
-cp .env.scalable.example .env
+POSTGRES_DB=chat
+POSTGRES_USER=chat
+POSTGRES_PASSWORD=chat
 ```
 
 Optional DB pool tuning:
@@ -231,31 +210,14 @@ SQLALCHEMY_POOL_TIMEOUT=30
 SQLALCHEMY_POOL_RECYCLE=1800
 ```
 
-### 2) Start scalable profile
+Start / validate:
 
 ```bash
-docker compose --profile scalable up -d --build
-```
-
-This starts:
-- `messenger`
-- `caddy`
-- `coturn`
-- `postgres` (profile: `scalable`)
-- `redis` (profile: `scalable`)
-
-### 3) Validate
-
-```bash
+docker compose up -d --build
 docker compose ps
 curl -v http://127.0.0.1:5000/health
-docker compose logs --tail=120 messenger
+docker compose logs --tail=120 messenger postgres
 ```
-
-### Notes
-
-- For single-node setup with high concurrent sockets, `gevent` + Redis queue is the recommended baseline.
-- If you stay on SQLite, keep `DATABASE_URL=sqlite:////app/instance/chat.db` and do **not** expect high write throughput.
 
 ## Maintenance automation
 
@@ -290,6 +252,7 @@ What it does:
 - verifies Ubuntu environment
 - installs Docker Engine + Compose plugin if missing
 - prepares/updates `.env` (domain, email, secrets, TURN settings)
+- prepares/updates PostgreSQL settings and `DATABASE_URL`
 - lets you choose deploy mode:
 1. full public stack (`messenger + caddy + coturn`)
 2. cloudflared mode (`messenger` on `127.0.0.1:5000`, optional cloudflared service setup)

@@ -12,6 +12,8 @@ PUBLIC_WEBRTC_STUN_FALLBACK = (
     "stun:stun4.l.google.com:19302",
 )
 
+DEFAULT_POSTGRES_DATABASE_URL = "postgresql+psycopg://chat:chat@postgres:5432/chat"
+
 
 def _env_bool(name: str, default: bool = False):
     raw_value = os.getenv(name)
@@ -55,6 +57,37 @@ def _env_int(name: str, default: int, *, min_value: int | None = None):
     if min_value is not None:
         return max(min_value, value)
     return value
+
+
+def _resolve_database_url() -> str:
+    raw_value = (os.getenv("DATABASE_URL") or "").strip()
+    database_url = raw_value or DEFAULT_POSTGRES_DATABASE_URL
+    normalized = database_url.lower()
+
+    if normalized.startswith("postgres://"):
+        # Keep compatibility with legacy URI style.
+        database_url = f"postgresql://{database_url[len('postgres://'):]}"
+
+    if not (
+        database_url.lower().startswith("postgresql://")
+        or database_url.lower().startswith("postgresql+psycopg://")
+    ):
+        raise RuntimeError(
+            "Unsupported DATABASE_URL scheme. "
+            "Only PostgreSQL is supported (postgresql:// or postgresql+psycopg://)."
+        )
+
+    return database_url
+
+
+def _build_sqlalchemy_engine_options():
+    return {
+        "pool_pre_ping": True,
+        "pool_size": _env_int("SQLALCHEMY_POOL_SIZE", 20, min_value=1),
+        "max_overflow": _env_int("SQLALCHEMY_MAX_OVERFLOW", 40, min_value=0),
+        "pool_timeout": _env_int("SQLALCHEMY_POOL_TIMEOUT", 30, min_value=1),
+        "pool_recycle": _env_int("SQLALCHEMY_POOL_RECYCLE", 1800, min_value=30),
+    }
 
 
 def _normalize_ice_servers(raw_servers):
@@ -159,14 +192,9 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-key-change-me-min-32-bytes")
 
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        f"sqlite:///{(INSTANCE_DIR / 'chat.db').as_posix()}",
-    )
+    SQLALCHEMY_DATABASE_URI = _resolve_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "connect_args": {"check_same_thread": False}
-    }
+    SQLALCHEMY_ENGINE_OPTIONS = _build_sqlalchemy_engine_options()
     TEMPLATES_AUTO_RELOAD = True
     SEND_FILE_MAX_AGE_DEFAULT = 0
 

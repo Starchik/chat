@@ -9,6 +9,9 @@ services:
     build:
       context: .
     container_name: chat_app
+    depends_on:
+      postgres:
+        condition: service_healthy
     env_file:
       - .env
     ports:
@@ -28,6 +31,27 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    restart: unless-stopped
+    logging: *logging_default
+    networks:
+      - chat_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chat}
+      POSTGRES_USER: ${POSTGRES_USER:-chat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chat}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chat} -d ${POSTGRES_DB:-chat}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
     logging: *logging_default
     networks:
@@ -78,3 +102,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  postgres_data:
