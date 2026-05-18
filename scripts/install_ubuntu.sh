@@ -40,6 +40,14 @@ as_root() {
   fi
 }
 
+as_target_user() {
+  if [[ "${EUID}" -eq 0 && "${TARGET_USER}" != "root" ]]; then
+    sudo -u "${TARGET_USER}" -H "$@"
+  else
+    "$@"
+  fi
+}
+
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     fail "Missing required command: $1"
@@ -239,6 +247,80 @@ services:
 YAML
 }
 
+setup_cloudflared_interactive() {
+  local domain="$1"
+  local local_port="$2"
+  local slug
+  local tunnel_name_default
+  local tunnel_name
+  local tunnel_id
+  local target_home
+  local config_path
+  local credentials_path
+  local overwrite_flag=""
+
+  target_home="$(getent passwd "${TARGET_USER}" | cut -d ':' -f6 || true)"
+  if [[ -z "${target_home}" ]]; then
+    fail "Cannot resolve home directory for user ${TARGET_USER}."
+  fi
+
+  slug="$(printf '%s' "${domain}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
+  if [[ -z "${slug}" ]]; then
+    slug="tunnel"
+  fi
+
+  tunnel_name_default="chat-${slug}"
+  tunnel_name="$(prompt "Cloudflare tunnel name" "${tunnel_name_default}")"
+  [[ -n "${tunnel_name}" ]] || fail "Tunnel name cannot be empty."
+  [[ "${tunnel_name}" =~ ^[A-Za-z0-9._-]+$ ]] || fail "Tunnel name may contain only letters, numbers, dot, dash, underscore."
+
+  log "Cloudflared interactive login..."
+  echo "A browser URL will be printed below."
+  echo "Open it, authorize domain ${domain}, then return to this terminal."
+  as_target_user bash -lc "cloudflared tunnel login"
+
+  log "Creating tunnel ${tunnel_name}..."
+  if ! as_target_user bash -lc "cloudflared tunnel create '${tunnel_name}'"; then
+    warn "Tunnel create command returned error. Trying to continue with existing tunnel ${tunnel_name}."
+  fi
+
+  tunnel_id="$(as_target_user bash -lc "cloudflared tunnel list | awk 'NR>1 && \$2==\"${tunnel_name}\" {print \$1; exit}'")"
+  [[ -n "${tunnel_id}" ]] || fail "Cannot find tunnel ID for ${tunnel_name}. Check cloudflared output."
+
+  if confirm_yes "Overwrite existing DNS record for ${domain} if needed?" 1; then
+    overwrite_flag="--overwrite-dns"
+  fi
+
+  log "Creating DNS route ${domain} -> tunnel ${tunnel_name}..."
+  as_target_user bash -lc "cloudflared tunnel route dns ${overwrite_flag} '${tunnel_name}' '${domain}'"
+
+  credentials_path="${target_home}/.cloudflared/${tunnel_id}.json"
+  config_path="${target_home}/.cloudflared/config.yml"
+
+  as_target_user mkdir -p "${target_home}/.cloudflared"
+  as_target_user bash -lc "cat > '${config_path}' <<EOF
+tunnel: ${tunnel_id}
+credentials-file: ${credentials_path}
+ingress:
+  - hostname: ${domain}
+    service: http://127.0.0.1:${local_port}
+  - service: http_status:404
+EOF"
+
+  if as_root test -f /etc/systemd/system/cloudflared.service || as_root test -f /usr/lib/systemd/system/cloudflared.service; then
+    if confirm_yes "cloudflared service already exists. Reinstall service using new config?" 1; then
+      as_root cloudflared service uninstall || true
+    fi
+  fi
+
+  as_root cloudflared --config "${config_path}" service install
+  as_root systemctl enable --now cloudflared
+  as_root systemctl restart cloudflared
+  as_root systemctl status cloudflared --no-pager || true
+
+  log "cloudflared interactive tunnel setup is complete."
+}
+
 log "Interactive installer for Ubuntu server"
 
 ubuntu_guard
@@ -250,6 +332,8 @@ require_cmd awk
 if [[ "${EUID}" -ne 0 ]] && ! command -v sudo >/dev/null 2>&1; then
   fail "sudo is required when script is not started as root."
 fi
+
+TARGET_USER="${SUDO_USER:-${USER}}"
 
 install_docker_stack
 
@@ -379,20 +463,14 @@ else
 
   (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d --build messenger coturn postgres)
 
-  if confirm_yes "Install/configure cloudflared service now?" 1; then
+  if confirm_yes "Install/configure cloudflared service now (interactive browser login)?" 1; then
     install_cloudflared_if_needed
-    CF_TOKEN="$(prompt "Paste Cloudflare Tunnel token (starts with ey...)" "")"
-    [[ -n "${CF_TOKEN}" ]] || fail "Cloudflare Tunnel token is required."
-    as_root cloudflared service install "${CF_TOKEN}"
-    as_root systemctl enable --now cloudflared
-    as_root systemctl restart cloudflared
-    log "cloudflared service installed and restarted."
+    setup_cloudflared_interactive "${DOMAIN}" "${CF_LOCAL_PORT}"
   else
     warn "cloudflared setup skipped. Configure it manually to proxy ${DOMAIN} -> http://127.0.0.1:${CF_LOCAL_PORT}"
   fi
 fi
 
-TARGET_USER="${SUDO_USER:-${USER}}"
 if id -nG "${TARGET_USER}" | grep -qw docker; then
   :
 else

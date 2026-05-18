@@ -258,4 +258,6 @@ What it does:
 2. cloudflared mode (`messenger` on `127.0.0.1:<local-port>`, default `5000`, optional cloudflared service setup)
 - starts containers and runs a local health check
 
-For cloudflared mode you need a Cloudflare Tunnel token and DNS record for your domain.
+For cloudflared mode you need a Cloudflare account with your domain already connected.
+The installer can run interactive `cloudflared tunnel login` (browser URL authorization),
+create a named tunnel, create DNS route, and install `cloudflared` service automatically.
