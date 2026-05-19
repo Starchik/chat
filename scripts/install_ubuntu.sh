@@ -250,7 +250,7 @@ write_cloudflared_override() {
   cat >"${CF_OVERRIDE_FILE}" <<YAML
 services:
   messenger:
-    ports:
+    ports: !override
       - "127.0.0.1:${local_port}:5000"
 YAML
 }
