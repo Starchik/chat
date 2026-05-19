@@ -54,6 +54,14 @@ require_cmd() {
   fi
 }
 
+docker_compose() {
+  if docker info >/dev/null 2>&1; then
+    docker compose "$@"
+  else
+    as_root docker compose "$@"
+  fi
+}
+
 prompt() {
   local label="$1"
   local default_value="${2:-}"
@@ -449,11 +457,11 @@ fi
 if [[ "${MODE_CHOICE}" == "1" ]]; then
   rm -f "${CF_OVERRIDE_FILE}"
   log "Starting full public stack..."
-  (cd "${REPO_DIR}" && docker compose down && docker compose up -d --build)
+  (cd "${REPO_DIR}" && docker_compose down && docker_compose up -d --build)
 else
   write_cloudflared_override "${CF_LOCAL_PORT}"
   log "Starting messenger in cloudflared mode..."
-  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml down)
+  (cd "${REPO_DIR}" && docker_compose -f docker-compose.yml -f docker-compose.cloudflared.yml down)
 
   if is_port_busy "${CF_LOCAL_PORT}"; then
     warn "Local port 127.0.0.1:${CF_LOCAL_PORT} is already in use."
@@ -461,7 +469,7 @@ else
     fail "Free port ${CF_LOCAL_PORT} or rerun installer and choose another local cloudflared port."
   fi
 
-  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d --build messenger coturn postgres)
+  (cd "${REPO_DIR}" && docker_compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d --build messenger coturn postgres)
 
   if confirm_yes "Install/configure cloudflared service now (interactive browser login)?" 1; then
     install_cloudflared_if_needed
@@ -481,9 +489,9 @@ fi
 
 log "Final checks:"
 if [[ "${MODE_CHOICE}" == "1" ]]; then
-  (cd "${REPO_DIR}" && docker compose ps)
+  (cd "${REPO_DIR}" && docker_compose ps)
 else
-  (cd "${REPO_DIR}" && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml ps)
+  (cd "${REPO_DIR}" && docker_compose -f docker-compose.yml -f docker-compose.cloudflared.yml ps)
 fi
 
 HEALTH_PORT="5000"
@@ -496,9 +504,9 @@ if curl -fsS "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1; then
 else
   warn "Health endpoint check failed. Inspect logs:"
   if [[ "${MODE_CHOICE}" == "1" ]]; then
-    echo "  cd ${REPO_DIR} && docker compose logs --tail=120 messenger"
+    echo "  cd ${REPO_DIR} && sudo docker compose logs --tail=120 messenger"
   else
-    echo "  cd ${REPO_DIR} && docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml logs --tail=120 messenger"
+    echo "  cd ${REPO_DIR} && sudo docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml logs --tail=120 messenger"
   fi
 fi
 
