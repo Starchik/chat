@@ -1,6 +1,6 @@
 ﻿from collections import defaultdict
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import current_app, request
 from flask_jwt_extended import decode_token
@@ -8,7 +8,7 @@ from flask_socketio import ConnectionRefusedError, emit, join_room, leave_room
 
 from app.extensions import db, socketio
 from app.models import Chat, ChatMembership, User
-from app.services import ChatService, MessageService
+from app.services import ChatService, MessageService, PushService
 from app.utils import utcnow
 
 
@@ -16,6 +16,7 @@ sid_to_user: dict[str, int] = {}
 user_to_sids: dict[int, set[str]] = defaultdict(set)
 active_calls: dict[str, dict] = {}
 user_active_call: dict[int, str] = {}
+pending_call_invites: dict[int, dict[str, dict]] = defaultdict(dict)
 
 
 def _extract_token(auth_payload):
@@ -57,6 +58,9 @@ def _clear_call_session(session_id: str):
     if not call:
         return None
 
+    _remove_pending_call_invite(call.get("callee_id"), session_id)
+    _remove_pending_call_invite(call.get("caller_id"), session_id)
+
     for participant_id in (call.get("caller_id"), call.get("callee_id")):
         if participant_id and user_active_call.get(participant_id) == session_id:
             user_active_call.pop(participant_id, None)
@@ -66,6 +70,67 @@ def _clear_call_session(session_id: str):
 
 def _emit_call_error(error_message: str):
     emit("call_error", {"error": error_message})
+
+
+def _cleanup_expired_pending_invites(user_id: int | None = None):
+    now = utcnow()
+    target_user_ids = [user_id] if user_id else list(pending_call_invites.keys())
+    for uid in target_user_ids:
+        invites = pending_call_invites.get(uid)
+        if not invites:
+            continue
+        expired_session_ids = [
+            session_id
+            for session_id, payload in invites.items()
+            if not isinstance(payload.get("expires_at"), datetime) or payload.get("expires_at") <= now
+        ]
+        for session_id in expired_session_ids:
+            invites.pop(session_id, None)
+        if not invites:
+            pending_call_invites.pop(uid, None)
+
+
+def _store_pending_call_invite(user_id: int, session_id: str, payload: dict, ttl_sec: int):
+    safe_ttl = max(5, int(ttl_sec))
+    pending_call_invites[user_id][session_id] = {
+        "payload": payload,
+        "expires_at": utcnow() + timedelta(seconds=safe_ttl),
+    }
+
+
+def _remove_pending_call_invite(user_id: int | None, session_id: str):
+    if not user_id:
+        return
+    invites = pending_call_invites.get(user_id)
+    if not invites:
+        return
+    invites.pop(session_id, None)
+    if not invites:
+        pending_call_invites.pop(user_id, None)
+
+
+def _deliver_pending_call_invites(user_id: int):
+    _cleanup_expired_pending_invites(user_id=user_id)
+    invites = pending_call_invites.get(user_id)
+    if not invites:
+        return
+
+    for session_id, envelope in list(invites.items()):
+        payload = envelope.get("payload") if isinstance(envelope, dict) else None
+        if not isinstance(payload, dict):
+            invites.pop(session_id, None)
+            continue
+
+        active_call = active_calls.get(session_id)
+        if not active_call or active_call.get("accepted"):
+            invites.pop(session_id, None)
+            continue
+
+        socketio.emit("call_invite", payload, room=f"user_{user_id}")
+        invites.pop(session_id, None)
+
+    if not invites:
+        pending_call_invites.pop(user_id, None)
 
 
 def _broadcast_chat_update(chat_id: int):
@@ -234,6 +299,7 @@ def socket_connect(auth=None):
     for membership in memberships:
         join_room(f"chat_{membership.chat_id}")
 
+    _deliver_pending_call_invites(user_id)
     _broadcast_user_status(user_id, True)
 
     emit("connected", {"user_id": user_id})
@@ -471,37 +537,9 @@ def socket_call_invite(data=None):
         )
         return
 
-    target_online = bool(user_to_sids.get(target_user_id))
-    if not target_online:
-        target_user = User.query.get(target_user_id)
-        target_online = bool(target_user and target_user.is_online)
-
-    if not target_online:
-        _log_call_message(
-            {
-                "session_id": session_id,
-                "chat_id": chat_id,
-                "kind": kind,
-                "caller_id": caller_id,
-                "callee_id": target_user_id,
-                "accepted": False,
-            },
-            reason="offline",
-            actor_id=caller_id,
-        )
-        emit(
-            "call_reject",
-            {
-                "session_id": session_id,
-                "chat_id": chat_id,
-                "from_user_id": target_user_id,
-                "reason": "offline",
-            },
-        )
-        return
-
     caller = User.query.get(caller_id)
     caller_name = caller.display_name if caller else "Пользователь"
+    ring_timeout_sec = int(current_app.config.get("WEBRTC_RING_TIMEOUT_SEC", 45))
 
     active_calls[session_id] = {
         "session_id": session_id,
@@ -516,20 +554,37 @@ def socket_call_invite(data=None):
     user_active_call[caller_id] = session_id
     user_active_call[target_user_id] = session_id
 
-    socketio.emit(
-        "call_invite",
-        {
-            "session_id": session_id,
-            "chat_id": chat_id,
-            "kind": kind,
-            "offer": offer,
-            "from_user_id": caller_id,
-            "from_display_name": caller_name,
-        },
-        room=f"user_{target_user_id}",
-    )
+    payload = {
+        "session_id": session_id,
+        "chat_id": chat_id,
+        "kind": kind,
+        "offer": offer,
+        "from_user_id": caller_id,
+        "from_display_name": caller_name,
+    }
+    socketio.emit("call_invite", payload, room=f"user_{target_user_id}")
 
-    ring_timeout_sec = int(current_app.config.get("WEBRTC_RING_TIMEOUT_SEC", 45))
+    # If callee has no active socket right now, keep invite briefly and try a web-push nudge.
+    _cleanup_expired_pending_invites(user_id=target_user_id)
+    if not user_to_sids.get(target_user_id):
+        _store_pending_call_invite(
+            user_id=target_user_id,
+            session_id=session_id,
+            payload=payload,
+            ttl_sec=ring_timeout_sec,
+        )
+        PushService.send_to_user(
+            current_app,
+            target_user_id,
+            {
+                "title": f"{_call_kind_label(kind)}",
+                "body": f"{caller_name} звонит вам",
+                "chat_id": chat_id,
+                "from_user_id": caller_id,
+                "type": "incoming_call",
+            },
+        )
+
     _schedule_call_timeout(session_id, ring_timeout_sec)
 
 

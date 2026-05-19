@@ -4,7 +4,13 @@ import { initUploadsModule } from "./uploads.js";
 import { initSocketModule } from "./socket.js";
 import { initCallsModule } from "./calls.js";
 
-const token = window.AppStorage.getToken();
+const initialUrlParams = new URLSearchParams(window.location.search);
+const tokenFromQuery = String(initialUrlParams.get("token") || "").trim();
+if (tokenFromQuery) {
+    window.AppStorage.setToken(tokenFromQuery);
+}
+
+const token = tokenFromQuery || window.AppStorage.getToken();
 if (!token) {
     window.location.href = "/login";
 }
@@ -681,7 +687,10 @@ async function boot() {
     await chats.loadChats();
     app.helpers.setChatSkeleton(false);
 
-    const queryChatId = Number(new URLSearchParams(window.location.search).get("chat"));
+    const runtimeParams = new URLSearchParams(window.location.search);
+    const queryChatId = Number(runtimeParams.get("chat"));
+    const queryCallKindRaw = String(runtimeParams.get("call") || "").toLowerCase();
+    const queryCallKind = queryCallKindRaw === "video" ? "video" : (queryCallKindRaw === "audio" ? "audio" : null);
     if (queryChatId && Number.isInteger(queryChatId)) {
         await chats.openChat(queryChatId);
     } else {
@@ -692,6 +701,24 @@ async function boot() {
     }
 
     socket.connect();
+
+    if (queryCallKind && app.state.currentChatId) {
+        let tries = 0;
+        const maxTries = 40;
+        const timerId = window.setInterval(() => {
+            tries += 1;
+            const canStart = app.modules?.socket?.isConnected?.() && app.modules?.calls?.startCall;
+            if (canStart) {
+                window.clearInterval(timerId);
+                void app.modules.calls.startCall(queryCallKind);
+                return;
+            }
+            if (tries >= maxTries) {
+                window.clearInterval(timerId);
+                showToast("Не удалось подготовить звонок");
+            }
+        }, 250);
+    }
 }
 
 boot();
