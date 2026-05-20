@@ -11,7 +11,6 @@ def runtime_config():
     return jsonify(
         {
             "webrtc_ice_servers": current_app.config.get("WEBRTC_ICE_SERVERS", []),
-            "webrtc_ring_timeout_sec": int(current_app.config.get("WEBRTC_RING_TIMEOUT_SEC", 45)),
+            "webrtc_ring_timeout_sec": int(current_app.config.get("WEBRTC_RING_TIMEOUT_SEC", 90)),
         }
     )
-

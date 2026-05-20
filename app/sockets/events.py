@@ -228,7 +228,7 @@ def _log_call_message(call: dict, reason: str, actor_id: int | None = None):
 
 def _schedule_call_timeout(session_id: str, timeout_sec: int):
     def _worker():
-        safe_timeout = timeout_sec if timeout_sec and timeout_sec > 0 else 45
+        safe_timeout = timeout_sec if timeout_sec and timeout_sec > 0 else 90
         socketio.sleep(safe_timeout)
 
         call = active_calls.get(session_id)
@@ -539,7 +539,7 @@ def socket_call_invite(data=None):
 
     caller = User.query.get(caller_id)
     caller_name = caller.display_name if caller else "Пользователь"
-    ring_timeout_sec = int(current_app.config.get("WEBRTC_RING_TIMEOUT_SEC", 45))
+    ring_timeout_sec = int(current_app.config.get("WEBRTC_RING_TIMEOUT_SEC", 90))
 
     active_calls[session_id] = {
         "session_id": session_id,

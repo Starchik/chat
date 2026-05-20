@@ -256,7 +256,7 @@ class Config:
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
     WEBRTC_ICE_SERVERS = _load_webrtc_ice_servers()
-    WEBRTC_RING_TIMEOUT_SEC = int(os.getenv("WEBRTC_RING_TIMEOUT_SEC", "45"))
+    WEBRTC_RING_TIMEOUT_SEC = int(os.getenv("WEBRTC_RING_TIMEOUT_SEC", "90"))
     WEBRTC_RINGTONE_INCOMING_URL = os.getenv(
         "WEBRTC_RINGTONE_INCOMING_URL",
         "/static/sounds/ring-incoming2.wav",

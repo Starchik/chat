@@ -634,7 +634,7 @@
             return;
         }
 
-        const timeoutSec = Math.max(15, Number(config.webrtcRingTimeoutSec) || 45);
+        const timeoutSec = Math.max(15, Number(config.webrtcRingTimeoutSec) || 90);
         ringTimeoutId = window.setTimeout(() => {
             if (!currentCall || currentCall.phase !== "ringing") {
                 return;

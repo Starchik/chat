@@ -185,10 +185,10 @@ def create_app():
     @app.context_processor
     def inject_runtime_config():
         return {
-            "runtime_config": {
-                "webrtc_ice_servers": app.config.get("WEBRTC_ICE_SERVERS", []),
-                "webrtc_ring_timeout_sec": int(app.config.get("WEBRTC_RING_TIMEOUT_SEC", 45)),
-                "webrtc_ringtone_incoming_url": app.config.get("WEBRTC_RINGTONE_INCOMING_URL", ""),
+                "runtime_config": {
+                    "webrtc_ice_servers": app.config.get("WEBRTC_ICE_SERVERS", []),
+                    "webrtc_ring_timeout_sec": int(app.config.get("WEBRTC_RING_TIMEOUT_SEC", 90)),
+                    "webrtc_ringtone_incoming_url": app.config.get("WEBRTC_RINGTONE_INCOMING_URL", ""),
                 "webrtc_ringtone_outgoing_url": app.config.get("WEBRTC_RINGTONE_OUTGOING_URL", ""),
                 "webrtc_ringtone_incoming_volume": float(app.config.get("WEBRTC_RINGTONE_INCOMING_VOLUME", 0.88)),
                 "webrtc_ringtone_outgoing_volume": float(app.config.get("WEBRTC_RINGTONE_OUTGOING_VOLUME", 0.72)),
